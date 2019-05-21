@@ -76,11 +76,36 @@ def readNumber(address_1):
                 x = bus.read_byte(address_1)
                 if x is 2:
                     flag = True
-                            
+
     except IOError as e:
         print (e)
     return number1,time.time()
 
+def scan():
+    mice = []
+    for i in ProT_arrange:
+        Data = Trash_Data
+        #time.sleep(0.01)
+
+        for x in Mapping_Dic[i]:
+            writeNumber(var, ProT[x])
+        time.sleep (0.13)
+        for x in Mapping_Dic[i]:
+            [Data,Time] = readNumber (ProT[x])
+            time.sleep  (0.01)
+            Time = time.time()
+            #Data = number1
+            if '\r' not in Data:
+                Data = []
+            if (Data != Trash_Data and Data != []):
+                try:
+                    number =  ''.join(Data)
+                    #The tag is always 10 characters long
+                    number = number[0:10]
+                    mice.append((int(number, 16), ProT_Dic[ProT[x]]))
+                except Exception as e:
+                    print(str(e))
+    return mice
 
 var = int(1)
 number1 = []
@@ -99,9 +124,9 @@ for j in range(10):
             for i in ProT_arrange:
                 Data = Trash_Data
                 #time.sleep(0.01)
-                
+
                 for x in Mapping_Dic[i]:
-                    writeNumber(var, ProT[x]) 
+                    writeNumber(var, ProT[x])
                 time.sleep (0.13)
                 for x in Mapping_Dic[i]:
                     [Data,Time] = readNumber (ProT[x])
