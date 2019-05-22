@@ -102,10 +102,20 @@ def scan():
                     number =  ''.join(Data)
                     #The tag is always 10 characters long
                     number = number[0:10]
-                    mice.append((int(number, 16), ProT_Dic[ProT[x]]))
+                    mice.append((int(number, 16), x))
                 except Exception as e:
                     print(str(e))
     return mice
+
+
+def readTag(tagID):
+    writeNumber(int(1), ProT[tagID])
+    time.sleep (0.13)
+    [Data,Time] = readNumber (ProT[tagID])
+    number =  ''.join(Data)
+    #The tag is always 10 characters long
+    number = number[0:10]
+    return (int(number, 16), x)
 
 var = int(1)
 number1 = []

@@ -11,38 +11,45 @@ mouseAreaMax = 9000 #???
 mouseTrackers = list()
 bundleTrackers = list()
 totMouseCount = 0
-prevFreeMice = 0
 prevBundledMice = 0
 currContourCount = 0
 
 # TODO: Find these numbers
 readerMap = [
-    [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0)], #1-(1-5) [y-x]
-    [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0)], #2-(1-5) [y-x]
-    [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0)]  #3-(1-5) [y-x]
+    (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), #1-(1-5) [y-x]
+    (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), #2-(1-5) [y-x]
+    (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)  #3-(1-5) [y-x]
 ]
 
-def cleanRFIDPosition(stringPos):
-    stringPos = stringPos.split('-')
-    position = (int(stringPos[1]) -1, int(stringPos[0]) -1) #Save in [y-x] form
-    return readerMap[position[0]][position[1]]
 
-def sortNearestTrackers(pos):
+def sortNearestFree(pos):
     """
     Sorts all non-bundled mice by their proximity to the given location.
     """
     remainingMice = list(filter(lambda x: not x.bundled(), mouseTrackers))
     return sorted(remainingMice, key= lambda x: x.distanceFromPos(pos))
 
+def sortNearest(pos):
+    """
+    Sorts all mice by their proximity to the given location.
+    """
+    return sorted(mouseTrackers, key= lambda x: x.distanceFromPos(pos))
+
 def sortNearestBundles(pos):
+    """
+    Sorts all bundles by their proximity to the given location.
+    """
     return sorted(bundleTrackers, key= lambda x: x["mice"][0].distanceFromPos(pos))
 
 def setup():
+    """
+    Adds all mice that can be read by the reader to the trackers.
+    """
     mice = RFID_Reader.scan()
     seenTags = []
     for (Tag, Position) in mice:
         if Tag not in seenTags:
-            cleanedPos = cleanRFIDPosition(Position)
+            cleanedPos = readerMap[Position]
             mouseTrackers.append(MouseTracker(cleanedPos, Tag))
             totMouseCount += 1
     lastContourCount = totMouseCount
@@ -109,6 +116,7 @@ def process():
         bundleCount = 0
         for contour in rawContours:
             if cv2.contourArea(contour) < mouseAreaMin:
+                #Not a mouse :(
                 continue
             elif cv2.contourArea(contour) < mouseAreaMax:
                 #This is just one mouse
@@ -116,51 +124,112 @@ def process():
                 centerX = int(moments["m10"] / moments["m00"])
                 centerY = int(moments["m01"] / moments["m00"])
                 processedContours.append({'contour': contour, 'bundle' = False, 'center': (centerX, centerY)})
-                currContourCount += 1
+                rotated_box = cv2.minAreaRect(contour)
+                box = cv2.boxPoints(rotated_box)
+                box = np.int0(box)
+                #Green Box
+                cv2.drawContours(frame, [box], 0, (0, 255, 0),2)
             else:
                 #This is multiple mice
                 moments = cv2.moments(contour)
                 centerX = int(moments["m10"] / moments["m00"])
                 centerY = int(moments["m01"] / moments["m00"])
                 processedContours.append({'contour': contour, 'bundle' = True, 'center': (centerX, centerY)})
-                bundleCount += 1
-                currContourCount += 1
+                rotated_box = cv2.minAreaRect(contour)
+                box = cv2.boxPoints(rotated_box)
+                box = np.int0(box)
+                #Red Box
+                cv2.drawContours(frame, [box], 0, (0, 0, 255),2)
 
-        freeMice = list(filter(lambda x: x.bundled(), mouseTrackers))
-        if len(freeMice) ==prevFreeMice:
+        prevFreeMice = list(filter(lambda x: not x.bundled(), mouseTrackers))
+        freeMouseContours = list(filter(lambda x: not x["bundle"]), processedContours)
+        bundleContours = list(filter(lambda x: x['bundle'], processedContours))
+        if len(freeMouseContours) ==len(prevFreeMice):
             #Simple. Update all mice with their new location
-            for proContour in list(filter(lambda x: not x['bundle'], processedContours)):
-                mouse = sortNearestTrackers(proContour["center"])[0]
+            for proContour in freeMouseContours:
+                mouse = sortNearestFree(proContour["center"])[0]
                 mouse.updatePosition(proContour["center"], False)
-            for proContour in list(filter(lambda x: x['bundle'], processedContours)):
-                bundle = sortNearestBundles(proContour["center"])
+            for proContour in bundleContours:
+                bundle = sortNearestBundles(proContour["center"])[0]
                 bundle["position"] = proContour["center"]
                 for mouse in bundle["mice"]:
                     mouse.updatePosition(proContour["center"], True)
-            prevFreeMice = len(freeMice)
-        elif len(freeMice) < prevFreeMice:
+        elif len(freeMouseContours) < len(prevFreeMice):
             #Some mice have joined new bundles.
             #For free mice, simple. Update all the remaining free mice.
-            for proContour in list(filter(lambda x: not x['bundle'], processedContours)):
-                mouse = sortNearestTrackers(proContour["center"])[0]
+            remainingMice = prevFreeMice.copy()
+            for proContour in freeMouseContours:
+                mouse = sortNearestFree(proContour["center"])[0]
                 mouse.updatePosition(proContour["center"], False)
+                remainingMice.remove(mouse)
             #Bundles: Form new bundles or make bigger ones
-            # TODO: figure out this
-        elif len(freeMice) > prevFreeMice:
+            for proContour in bundleContours:
+                nearestMice = sortNearest(proContour["center"])
+                if(nearestMice[0].bundled()):
+                    #This is a previously created bundle! (Mice in a bundle have same position as bundle center)
+                    bundle = sortNearestBundles(proContour["center"])[0]
+                    bundle["position"] = proContour["center"]
+                    for mouse in bundle["mice"]:
+                        mouse.updatePosition(proContour["center"], True)
+                    continue
+                else:
+                    #New bundle!
+                    #First two will *always* be part of the bundle, otherwise the bundle would be merged with another.
+                    mice = []
+                    mice.append(nearestMice[0])
+                    #This mouse *has* to be in remaining mice, otherwise it is both the closest
+                    #to a free contour and a bundle contour, which is impossible.
+                    remainingMice.remove(nearestMice[0])
+                    nearestMice[0].updatePosition(proContour["center"], True)
+                    mice.append(nearestMice[1])
+                    nearestMice[1].updatePosition(proContour["center"], True)
+                    remainingMice.remove(nearestMice[1])
+                    bundleTrackers.append({"position": proContour["center"], "mice": mice})
+            #Now any remaining mice must be in a bundle.
+            for mouse in remainingMice:
+                nearestBundle = min(bundleContours, key=lambda x: mouse.distanceFromPos(x))
+                mouse.updatePosition(nearestBundle["center"], True)
+                bundle = sortNearestBundles(proContour["center"])[0]
+                bundle["mice"].append(mouse)
+        elif len(freeMouseContours) > len(prevFreeMice):
             #Some mice have left their bundles.
-            filteredContours = list(filter(lambda x: not x['bundle'], processedContours)
-            for mouse in mouseTrackers:
-                sortedContours = sorted(filteredContours, key=lambda x: mouse.distanceFromPos(x))
-                mouse.updatePosition(sortedContours[i], False)
-                processedContours.remove(sortedContours[i])
-            
+            for mouse in freeMice:
+                nearestContour = min(freeMouseContours, key=lambda x: mouse.distanceFromPos(x))
+                mouse.updatePosition(nearestContour["center"], False)
+                processedContours.remove(nearestContour)
+                freeMouseContours.remove(nearestContour)
+            for contour in freeMouseContours:
+                #Update mouse with tag
+                x2 = contour["center"][0]
+                y2 = contour["center"][1]
+                nearestTagIndex = index(min(readerMap, key= lambda x: np.sqrt(((x[0]-x2)*(x[0]-x2) + (x[1]-y2)*(x[1]-y2)))))
+                tag = RFID_Reader.readTag(nearestTagIndex)[0]
+                mouse = filter(lambda x: x.tag() is tag, mouseTrackers)
+                mouse.updatePosition(contour["center"], False)
+                #Update remaining bundles
+                for proContour in bundleContours:
+                    bundle = sortNearestBundles(proContour["center"])[0]
+                    bundle["position"] = proContour["center"]
+                    bundle["processed"] = True
+                    for mouse in bundle["mice"]:
+                        if mouse.bundled():
+                            mouse.updatePosition(proContour["center"], True)
+                        else:
+                            bundle["mice"].remove(mouse)
+                #Remove any unprocessed bundles (these are now empty)
+                for bundle in bundleTrackers:
+                    if bundle["processed"]:
+                        bundle["processed"] = False
+                    else:
+                        bundleTrackers.remove(bundle)
+
 
         # for proContour in list(filter(lambda x: x['bundle'], processedContours)):
         #     #First two will *always* be part of the bundle, otherwise the bundle would be merged with another.
         #     mice = []
-        #     mice.append(sortNearestTrackers(proContour.center)[0])
-        #     sortNearestTrackers(proContour.center)[0].updatePosition(proContour.center, True)
-        #     mice.append(sortNearestTrackers(proContour.center)[1])
-        #     sortNearestTrackers(proContour.center)[1].updatePosition(proContour.center, True)
+        #     mice.append(sortNearestFree(proContour.center)[0])
+        #     sortNearestFree(proContour.center)[0].updatePosition(proContour.center, True)
+        #     mice.append(sortNearestFree(proContour.center)[1])
+        #     sortNearestFree(proContour.center)[1].updatePosition(proContour.center, True)
         #     bundleTrackers.append({"position": proContour.center, "mice": mice})
         #     miceToBundle -=2

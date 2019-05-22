@@ -22,6 +22,9 @@ class MouseTracker:
     def bundled(self):
         return self.bundled
 
+    def tag(self):
+        return self.id
+
 """
     We have 5 mice
     at positions (1,1), (232, 222), (77, 11), (2, 10), (72, 8)
