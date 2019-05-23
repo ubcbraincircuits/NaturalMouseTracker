@@ -40,13 +40,12 @@ ProT_Dic = {ProT[0]:"1-1",ProT[1]:"1-2",ProT[2]:"1-3",ProT[3]:"1-4",
 # From testing, this unfortnuately leaves the middle units without a pair.
 Mapping_Dic = { 0: [0, 4], 1: [1, 5], 2: [6, 10], 3:[7, 11],
                 4: [12, 16], 5: [13, 17], 6: [14], 7: [15],
-                8: [8], 9:[9]}
-                #, 10: [2], 11:[3]}
+                8: [8], 9:[9], 10: [2], 11:[3]}
 
 
 #ProT_arrange = [i for i in range(0,18)]
 #ProT_arrange = [i for i in range(0,8)]
-ProT_arrange = [i for i in range(0,10)]
+ProT_arrange = [i for i in range(0,12)]
 #ProT_arrange = [0,8,6,2,1,7]
 
 #Write a number over the I2C bus.
@@ -88,7 +87,7 @@ def scan():
         #time.sleep(0.01)
 
         for x in Mapping_Dic[i]:
-            writeNumber(var, ProT[x])
+            writeNumber(int(1), ProT[x])
         time.sleep (0.13)
         for x in Mapping_Dic[i]:
             [Data,Time] = readNumber (ProT[x])
@@ -117,43 +116,44 @@ def readTag(tagID):
     number = number[0:10]
     return (int(number, 16), x)
 
-var = int(1)
-number1 = []
-#camera.capture ('/home/pi/Tracking_system/mouse_cage_tracking_pic.jpg')
-time.sleep(15)
-t0 = time.time()
-t = time.time()
-for j in range(10):
-    #camera.resolution = (500,312)
-    #camera.framerate = 30
-    #camera.start_recording ('/home/pi/Tracking_system/mouse_cage_tracking_vid.h264')
-    with open ("RTS_test.txt" , "w") as f:
-        f.write (str(t0)+"\n")
-        while t-t0<500:
-            t=time.time()
-            for i in ProT_arrange:
-                Data = Trash_Data
-                #time.sleep(0.01)
+if __name__=="__main__":
+    var = int(1)
+    number1 = []
+    #camera.capture ('/home/pi/Tracking_system/mouse_cage_tracking_pic.jpg')
+    time.sleep(15)
+    t0 = time.time()
+    t = time.time()
+    for j in range(10):
+        #camera.resolution = (500,312)
+        #camera.framerate = 30
+        #camera.start_recording ('/home/pi/Tracking_system/mouse_cage_tracking_vid.h264')
+        with open ("RTS_test.txt" , "w") as f:
+            f.write (str(t0)+"\n")
+            while t-t0<500:
+                t=time.time()
+                for i in ProT_arrange:
+                    Data = Trash_Data
+                    #time.sleep(0.01)
 
-                for x in Mapping_Dic[i]:
-                    writeNumber(var, ProT[x])
-                time.sleep (0.13)
-                for x in Mapping_Dic[i]:
-                    [Data,Time] = readNumber (ProT[x])
-                    time.sleep  (0.01)
-                    Time = time.time()
-                    #Data = number1
-                    if '\r' not in Data:
-                        Data = []
-                    if (Data != Trash_Data and Data != []):
-                        try:
-                            number =  ''.join(Data)
-                            #The tag is always 10 characters long
-                            number = number[0:10]
-                            f.write (str(int(number, 16))+" "+ProT_Dic[ProT[x]]+" "+str(Time)+"\n")
-                            print (ProT_Dic[ProT[x]])
-                            print (Data,Time)
-                            print(number, int(number, 16))
-                        except Exception as e:
-                            print(str(e))
-    #camera.stop_recording()
+                    for x in Mapping_Dic[i]:
+                        writeNumber(var, ProT[x])
+                    time.sleep (0.13)
+                    for x in Mapping_Dic[i]:
+                        [Data,Time] = readNumber (ProT[x])
+                        time.sleep  (0.01)
+                        Time = time.time()
+                        #Data = number1
+                        if '\r' not in Data:
+                            Data = []
+                        if (Data != Trash_Data and Data != []):
+                            try:
+                                number =  ''.join(Data)
+                                #The tag is always 10 characters long
+                                number = number[0:10]
+                                f.write (str(int(number, 16))+" "+ProT_Dic[ProT[x]]+" "+str(Time)+"\n")
+                                print (ProT_Dic[ProT[x]])
+                                print (Data,Time)
+                                print(number, int(number, 16))
+                            except Exception as e:
+                                print(str(e))
+        #camera.stop_recording()

@@ -4,15 +4,13 @@ import imutils
 import time
 import cv2
 import RFID_Reader
-import MouseTracker from MouseTracker
+from MouseTracker import MouseTracker
 mouseAreaMin = 4500
 mouseAreaMax = 9000 #???
 #Main Loop
 mouseTrackers = list()
 bundleTrackers = list()
-totMouseCount = 0
 prevBundledMice = 0
-currContourCount = 0
 
 # TODO: Find these numbers
 readerMap = [
@@ -45,14 +43,15 @@ def setup():
     """
     Adds all mice that can be read by the reader to the trackers.
     """
+    time.sleep(5)
+    print("setup start")
     mice = RFID_Reader.scan()
+    print("done scan")
     seenTags = []
     for (Tag, Position) in mice:
         if Tag not in seenTags:
             cleanedPos = readerMap[Position]
             mouseTrackers.append(MouseTracker(cleanedPos, Tag))
-            totMouseCount += 1
-    lastContourCount = totMouseCount
 
 
 def process():
@@ -61,6 +60,7 @@ def process():
     firstFrame = None
     while True:
         #Grab the current frame
+        print("got the frame")
         (grabbed, frame) = camera.read()
 
         #If we could not get the frame, then we have reached the end of the stream.
@@ -123,7 +123,7 @@ def process():
                 moments = cv2.moments(contour)
                 centerX = int(moments["m10"] / moments["m00"])
                 centerY = int(moments["m01"] / moments["m00"])
-                processedContours.append({'contour': contour, 'bundle' = False, 'center': (centerX, centerY)})
+                processedContours.append({'contour': contour, 'bundle': False, 'center': (centerX, centerY)})
                 rotated_box = cv2.minAreaRect(contour)
                 box = cv2.boxPoints(rotated_box)
                 box = np.int0(box)
@@ -134,7 +134,7 @@ def process():
                 moments = cv2.moments(contour)
                 centerX = int(moments["m10"] / moments["m00"])
                 centerY = int(moments["m01"] / moments["m00"])
-                processedContours.append({'contour': contour, 'bundle' = True, 'center': (centerX, centerY)})
+                processedContours.append({'contour': contour, 'bundle': True, 'center': (centerX, centerY)})
                 rotated_box = cv2.minAreaRect(contour)
                 box = cv2.boxPoints(rotated_box)
                 box = np.int0(box)
@@ -223,7 +223,9 @@ def process():
                     else:
                         bundleTrackers.remove(bundle)
 
-
+print('hello')
+setup()
+process()
         # for proContour in list(filter(lambda x: x['bundle'], processedContours)):
         #     #First two will *always* be part of the bundle, otherwise the bundle would be merged with another.
         #     mice = []
