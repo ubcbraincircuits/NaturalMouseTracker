@@ -1,6 +1,6 @@
 #include <Wire.h>
 
-#define SLAVE_ADDRESS 0x34
+#define SLAVE_ADDRESS 0x14 
 
 const int totalLength = 16;
 char Tag [totalLength];

@@ -2,6 +2,8 @@
 import datetime
 import imutils
 import time
+from picamera.array import PiRGBArray
+from picamera import PiCamera
 import cv2
 import RFID_Reader
 from MouseTracker import MouseTracker
@@ -55,17 +57,22 @@ def setup():
 
 
 def process():
-    camera = cv2.VideoCapture(0)
+    #camera = cv2.VideoCapture(0)
+    camera = PiCamera()
+    camera.resolution = (640, 480)
+    camera.framerate = 32
+    rawCapture = PiRGBArray(Camera, size=(640, 480))
+
     time.sleep(0.25)
     firstFrame = None
-    while True:
+    for frame in camera.capture_continuous(rawCapture, format = "bgr", use_video_port=True):
         #Grab the current frame
-        print("got the frame")
-        (grabbed, frame) = camera.read()
-
-        #If we could not get the frame, then we have reached the end of the stream.
-        if not grabbed:
-            break;
+        # print("got the frame")
+        # (grabbed, frame) = camera.read()
+        #
+        # #If we could not get the frame, then we have reached the end of the stream.
+        # if not grabbed:
+        #     break;
         #Convert to grayscale, resize, and blur the frame
         frame = imutils.resize(frame, width = 500)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -141,6 +148,8 @@ def process():
                 #Red Box
                 cv2.drawContours(frame, [box], 0, (0, 0, 255),2)
 
+
+        cv.imshow("Mouse Tracking", frame)
         prevFreeMice = list(filter(lambda x: not x.bundled(), mouseTrackers))
         freeMouseContours = list(filter(lambda x: not x["bundle"]), processedContours)
         bundleContours = list(filter(lambda x: x['bundle'], processedContours))
