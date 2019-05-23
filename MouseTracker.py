@@ -12,6 +12,9 @@ class MouseTracker:
         self.currCoord = coordinate
         self.bundled = isBundle
 
+    def getPosition(self):
+        return self.currCoord
+
     def distanceFromPos(self, pos):
         x1 = self.currCoord[0]
         y1 = self.currCoord[1]

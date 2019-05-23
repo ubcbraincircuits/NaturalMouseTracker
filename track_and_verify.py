@@ -13,6 +13,7 @@ mouseAreaMax = 9000 #???
 mouseTrackers = list()
 bundleTrackers = list()
 prevBundledMice = 0
+fileName = "test.txt"
 
 # TODO: Find these numbers
 readerMap = [
@@ -50,6 +51,7 @@ def setup():
     mice = RFID_Reader.scan()
     print("done scan")
     seenTags = []
+    open(fileName, "w+").close()
     for (Tag, Position) in mice:
         if Tag not in seenTags:
             cleanedPos = readerMap[Position]
@@ -231,6 +233,13 @@ def process():
                         bundle["processed"] = False
                     else:
                         bundleTrackers.remove(bundle)
+    for mouse in mouseTrackers:
+        pos = mouse.getPosition()
+        file = open(fileName, 'a')
+        log = str('%.4f' %time.time()) + ';' + '[' + str(mouse.tag()) + ']' + ';' + str(pos) + '\n'
+        file.write(log)
+        file.close()
+
 
 print('hello')
 setup()
