@@ -251,15 +251,17 @@ def process():
                         bundle["processed"] = False
                     else:
                         bundleTrackers.remove(bundle)
-         if key==ord('q'):
+        for mouse in mouseTrackers:
+            pos = mouse.getPosition()
+            file = open(fileName, 'a')
+            log = str('%.4f' %time.time()) + ';' + '[' + str(mouse.tag()) + ']' + ';' + str(pos) + '\n'
+            file.write(log)
+            file.close()
+            
+        if key==ord('q'):
             break
         
-    for mouse in mouseTrackers:
-        pos = mouse.getPosition()
-        file = open(fileName, 'a')
-        log = str('%.4f' %time.time()) + ';' + '[' + str(mouse.tag()) + ']' + ';' + str(pos) + '\n'
-        file.write(log)
-        file.close()
+    
 
 
         
