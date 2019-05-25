@@ -114,7 +114,9 @@ def readTag(tagID):
     number =  ''.join(Data)
     #The tag is always 10 characters long
     number = number[0:10]
-    return (int(number, 16), x)
+    if number == '':
+        return False
+    return (int(number, 16), tagID)
 
 if __name__=="__main__":
     var = int(1)

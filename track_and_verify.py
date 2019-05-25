@@ -5,10 +5,11 @@ import time
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 import cv2
+import numpy as np
 import RFID_Reader
 from MouseTracker import MouseTracker
 mouseAreaMin = 4500
-mouseAreaMax = 9000 #???
+mouseAreaMax = 14000 #avoid recognizing thicc mice as multiple mice
 #Main Loop
 mouseTrackers = list()
 bundleTrackers = list()
@@ -17,9 +18,9 @@ fileName = "test.txt"
 
 # TODO: Find these numbers
 readerMap = [
-    (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), #1-(1-5) [y-x]
-    (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), #2-(1-5) [y-x]
-    (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)  #3-(1-5) [y-x]
+    (75, 115), (173, 113), (283, 113), (395, 118), (496, 127), (587, 136), #1-(1-6) [y-x]
+    (75, 215), (174, 213), (283, 220), (390, 220), (495, 225), (585, 227), #2-(1-6) [y-x]
+    (78, 315), (175, 316), (283, 320), (390, 320), (487, 325), (577, 320)  #3-(1-5) [y-x]
 ]
 
 
@@ -27,7 +28,7 @@ def sortNearestFree(pos):
     """
     Sorts all non-bundled mice by their proximity to the given location.
     """
-    remainingMice = list(filter(lambda x: not x.bundled(), mouseTrackers))
+    remainingMice = list(filter(lambda x: not x.bundled, mouseTrackers))
     return sorted(remainingMice, key= lambda x: x.distanceFromPos(pos))
 
 def sortNearest(pos):
@@ -63,11 +64,11 @@ def process():
     camera = PiCamera()
     camera.resolution = (640, 480)
     camera.framerate = 32
-    rawCapture = PiRGBArray(Camera, size=(640, 480))
+    rawCapture = PiRGBArray(camera, size=(640, 480))
 
     time.sleep(0.25)
     firstFrame = None
-    for frame in camera.capture_continuous(rawCapture, format = "bgr", use_video_port=True):
+    for rawFrame in camera.capture_continuous(rawCapture, format = "bgr", use_video_port=True):
         #Grab the current frame
         # print("got the frame")
         # (grabbed, frame) = camera.read()
@@ -76,7 +77,8 @@ def process():
         # if not grabbed:
         #     break;
         #Convert to grayscale, resize, and blur the frame
-        frame = imutils.resize(frame, width = 500)
+        #frame = imutils.resize(frame, width = 500)
+        frame = rawFrame.array
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         gray = cv2.GaussianBlur(gray, (21,21), 0)
 
@@ -85,10 +87,10 @@ def process():
             firstFrame = gray
 
         #Compute difference between current and first frame, fill in holes, and find contours
-        frameDelta = cv2.absDiff(firstFrame, gray)
-        thresh = cv2.threshold(frameDelta, 100, 255, cv2.THREAD_BINARY)[1]
+        frameDelta = cv2.absdiff(firstFrame, gray)
+        thresh = cv2.threshold(frameDelta, 100, 255, cv2.THRESH_BINARY)[1]
         thresh = cv2.dilate(thresh, None, iterations=2)
-        (_, rawContours, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        (rawContours, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         processedContours = list()
         """
@@ -125,9 +127,11 @@ def process():
         bundleCount = 0
         for contour in rawContours:
             if cv2.contourArea(contour) < mouseAreaMin:
+                print("no mouse")
                 #Not a mouse :(
                 continue
             elif cv2.contourArea(contour) < mouseAreaMax:
+                print("hey it a mouse yo")
                 #This is just one mouse
                 moments = cv2.moments(contour)
                 centerX = int(moments["m10"] / moments["m00"])
@@ -140,6 +144,7 @@ def process():
                 cv2.drawContours(frame, [box], 0, (0, 255, 0),2)
             else:
                 #This is multiple mice
+                print("o shit so many mice")
                 moments = cv2.moments(contour)
                 centerX = int(moments["m10"] / moments["m00"])
                 centerY = int(moments["m01"] / moments["m00"])
@@ -151,9 +156,12 @@ def process():
                 cv2.drawContours(frame, [box], 0, (0, 0, 255),2)
 
 
-        cv.imshow("Mouse Tracking", frame)
-        prevFreeMice = list(filter(lambda x: not x.bundled(), mouseTrackers))
-        freeMouseContours = list(filter(lambda x: not x["bundle"]), processedContours)
+        cv2.imshow("Mouse Tracking", thresh)
+        key = cv2.waitKey(1)& 0xFF
+        # clear stream to prepare for next frame
+        rawFrame.truncate(0)
+        prevFreeMice = list(filter(lambda x: not x.bundled, mouseTrackers))
+        freeMouseContours = list(filter(lambda x: not x["bundle"], processedContours))
         bundleContours = list(filter(lambda x: x['bundle'], processedContours))
         if len(freeMouseContours) ==len(prevFreeMice):
             #Simple. Update all mice with their new location
@@ -176,7 +184,7 @@ def process():
             #Bundles: Form new bundles or make bigger ones
             for proContour in bundleContours:
                 nearestMice = sortNearest(proContour["center"])
-                if(nearestMice[0].bundled()):
+                if(nearestMice[0].bundled):
                     #This is a previously created bundle! (Mice in a bundle have same position as bundle center)
                     bundle = sortNearestBundles(proContour["center"])[0]
                     bundle["position"] = proContour["center"]
@@ -203,8 +211,8 @@ def process():
                 bundle = sortNearestBundles(proContour["center"])[0]
                 bundle["mice"].append(mouse)
         elif len(freeMouseContours) > len(prevFreeMice):
-            #Some mice have left their bundles.
-            for mouse in freeMice:
+            #Some mice have left their bundles, or new mice have arrived.
+            for mouse in prevFreeMice:
                 nearestContour = min(freeMouseContours, key=lambda x: mouse.distanceFromPos(x))
                 mouse.updatePosition(nearestContour["center"], False)
                 processedContours.remove(nearestContour)
@@ -213,10 +221,20 @@ def process():
                 #Update mouse with tag
                 x2 = contour["center"][0]
                 y2 = contour["center"][1]
-                nearestTagIndex = index(min(readerMap, key= lambda x: np.sqrt(((x[0]-x2)*(x[0]-x2) + (x[1]-y2)*(x[1]-y2)))))
-                tag = RFID_Reader.readTag(nearestTagIndex)[0]
-                mouse = filter(lambda x: x.tag() is tag, mouseTrackers)
-                mouse.updatePosition(contour["center"], False)
+                nearestTagIndex = readerMap.index(min(readerMap, key= lambda x: np.sqrt(((x[0]-x2)*(x[0]-x2) + (x[1]-y2)*(x[1]-y2)))))
+                print(nearestTagIndex)
+                #tag readers are upside down, fix later
+                tag = False
+                while tag is False:
+                    tag = RFID_Reader.readTag(17 - nearestTagIndex)
+                tag = tag[0]
+                mouseList = list(filter(lambda x: x.tag() is tag, mouseTrackers))
+                if len(mouseList) is 0:
+                    mouseTrackers.append(MouseTracker(nearestTagIndex, tag))
+                    mouseList = list(filter(lambda x: x.tag() is tag, mouseTrackers))
+                    mouseList[0].updatePosition(contour["center"], False)
+                else:
+                    mouseList[0].updatePosition(contour["center"], False)
                 #Update remaining bundles
                 for proContour in bundleContours:
                     bundle = sortNearestBundles(proContour["center"])[0]
@@ -233,6 +251,9 @@ def process():
                         bundle["processed"] = False
                     else:
                         bundleTrackers.remove(bundle)
+         if key==ord('q'):
+            break
+        
     for mouse in mouseTrackers:
         pos = mouse.getPosition()
         file = open(fileName, 'a')
@@ -241,9 +262,12 @@ def process():
         file.close()
 
 
-print('hello')
-setup()
-process()
+        
+if __name__=="__main__":
+    print('hello')
+    #setup()
+    process()
+
         # for proContour in list(filter(lambda x: x['bundle'], processedContours)):
         #     #First two will *always* be part of the bundle, otherwise the bundle would be merged with another.
         #     mice = []
