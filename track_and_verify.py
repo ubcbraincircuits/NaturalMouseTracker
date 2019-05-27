@@ -206,14 +206,18 @@ def process():
                     bundleTrackers.append({"position": proContour["center"], "mice": mice})
             #Now any remaining mice must be in a bundle.
             for mouse in remainingMice:
-                nearestBundle = min(bundleContours, key=lambda x: mouse.distanceFromPos(x))
+                if len(bundleContours) is 0:
+                   #Mouse has left
+                    mouseTrackers.remove(mouse)
+                    continue
+                nearestBundle = min(bundleContours, key=lambda x: mouse.distanceFromPos(x["center"]))
                 mouse.updatePosition(nearestBundle["center"], True)
                 bundle = sortNearestBundles(proContour["center"])[0]
                 bundle["mice"].append(mouse)
         elif len(freeMouseContours) > len(prevFreeMice):
             #Some mice have left their bundles, or new mice have arrived.
             for mouse in prevFreeMice:
-                nearestContour = min(freeMouseContours, key=lambda x: mouse.distanceFromPos(x))
+                nearestContour = min(freeMouseContours, key=lambda x: mouse.distanceFromPos(x["center"]))
                 mouse.updatePosition(nearestContour["center"], False)
                 processedContours.remove(nearestContour)
                 freeMouseContours.remove(nearestContour)

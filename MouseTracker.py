@@ -16,6 +16,7 @@ class MouseTracker:
         return self.currCoord
 
     def distanceFromPos(self, pos):
+        print("position:", pos)
         x1 = self.currCoord[0]
         y1 = self.currCoord[1]
         x2 = pos[0]
