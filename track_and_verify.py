@@ -9,7 +9,7 @@ import numpy as np
 import RFID_Reader
 from MouseTracker import MouseTracker
 mouseAreaMin = 4500
-mouseAreaMax = 16500 #avoid recognizing thicc mice as multiple mice
+mouseAreaMax = 15000 #avoid recognizing thicc mice as multiple mice
 #Main Loop
 mouseTrackers = list()
 bundleTrackers = list()
@@ -179,6 +179,9 @@ def process():
                     mouse = sortNearestFree(proContour["center"])[0]
                     mouse.updatePosition(proContour["center"], False)
                 for proContour in bundleContours:
+                    if len(bundleTrackers) == 0:
+                        #Handle it next time
+                        break
                     bundle = sortNearestBundles(proContour["center"])[0]
                     bundle["position"] = proContour["center"]
                     for mouse in bundle["mice"]:
@@ -197,6 +200,8 @@ def process():
                     if(nearestMice[0].bundled and len(bundleTrackers) >0):
                         #This is a previously created bundle! (Mice in a bundle have same position as bundle center)
                         print(bundleTrackers)
+                        if len(bundleTrackers)==0:
+                            break
                         bundle = sortNearestBundles(proContour["center"])[0]
                         bundle["position"] = proContour["center"]
                         for mouse in bundle["mice"]:
@@ -207,6 +212,8 @@ def process():
                         #First two will *always* be part of the bundle, otherwise the bundle would be merged with another.
                         mice = []
                         print(len(remainingMice))
+                        if len(remainingMice) < 2:
+                            break
                         mice.append(nearestMice[0])
                         #This mouse *has* to be in remaining mice, otherwise it is both the closest
                         #to a free contour and a bundle contour, which is impossible.
@@ -218,7 +225,7 @@ def process():
                         bundleTrackers.append({"position": proContour["center"], "mice": mice, "processed": False})
                 #Now any remaining mice must be in a bundle.
                 for mouse in remainingMice:
-                    if len(bundleContours) is 0:
+                    if len(bundleContours) is 0 or len(bundleTrackers) is 0:
                        #Mouse has left
                         mouseTrackers.remove(mouse)
                         continue
@@ -247,12 +254,17 @@ def process():
                     tag = False
                     index = 0
                     num = 0
+                    count = 0
                     while tag is False:
                         index = readerMap.index(nearestReaders[num])
                         tag = RFID_Reader.readTag(17 - index)
-                        num+= 1
-                        if num > 3:
-                            num = 0
+                        count+= 1
+                        num = count%3
+                        if count > 7:
+                            break
+                    if tag is False:
+                        #Try again next time
+                        break
                     tag = tag[0]
                     mouseList = list(filter(lambda x: x.tag() is tag, mouseTrackers))
                     if len(mouseList) is 0:
