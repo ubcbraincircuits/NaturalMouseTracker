@@ -9,7 +9,7 @@ import numpy as np
 import RFID_Reader
 from MouseTracker import MouseTracker
 mouseAreaMin = 4500
-mouseAreaMax = 16000 #avoid recognizing thicc mice as multiple mice
+mouseAreaMax = 16500 #avoid recognizing thicc mice as multiple mice
 #Main Loop
 mouseTrackers = list()
 bundleTrackers = list()
@@ -233,7 +233,7 @@ def process():
             elif len(freeMouseContours) > len(prevFreeMice):
                 #Some mice have left their bundles, or new mice have arrived.
                 for mouse in prevFreeMice:
-                    nearestContour = min(freeMouseContours, key=lambda x: mouse.distanceFromPos(x["center"]))
+                    nearestContour = sorted(freeMouseContours, key=lambda x: mouse.distanceFromPos(x["center"]))[0]
                     mouse.updatePosition(nearestContour["center"], False)
                     processedContours.remove(nearestContour)
                     freeMouseContours.remove(nearestContour)
