@@ -14,6 +14,7 @@ mouseAreaMax = 14000 #avoid recognizing thicc mice as multiple mice
 mouseTrackers = list()
 bundleTrackers = list()
 prevBundledMice = 0
+maxMovement = 30
 fileName = "test.txt"
 
 # TODO: Find these numbers
@@ -211,6 +212,10 @@ def process():
                     mouseTrackers.remove(mouse)
                     continue
                 nearestBundle = min(bundleContours, key=lambda x: mouse.distanceFromPos(x["center"]))
+                if mouse.distanceFromPos(nearestBundle["center"]) > maxMovement:
+                    #Mouse has left (or we lost it)
+                    mouseTrackers.remove(mouse)
+                    continue
                 mouse.updatePosition(nearestBundle["center"], True)
                 bundle = sortNearestBundles(proContour["center"])[0]
                 bundle["mice"].append(mouse)
