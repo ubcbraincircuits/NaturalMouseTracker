@@ -251,7 +251,7 @@ def process():
                         index = readerMap.index(nearestReaders[num])
                         tag = RFID_Reader.readTag(17 - index)
                         num+= 1
-                        if num > 17:
+                        if num > 3:
                             num = 0
                     tag = tag[0]
                     mouseList = list(filter(lambda x: x.tag() is tag, mouseTrackers))
