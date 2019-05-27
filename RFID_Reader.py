@@ -116,7 +116,10 @@ def readTag(tagID):
     number = number[0:10]
     if number == '':
         return False
-    return (int(number, 16), tagID)
+    try:
+        return (int(number, 16), tagID)
+    except Exception as e:
+        return False
 
 if __name__=="__main__":
     var = int(1)
