@@ -48,17 +48,18 @@ def setup():
     """
     Adds all mice that can be read by the reader to the trackers.
     """
-    time.sleep(5)
     print("setup start")
     mice = RFID_Reader.scan()
     print("done scan")
     seenTags = []
-    open(fileName, "w+").close()
-    for (Tag, Position) in mice:
-        if Tag not in seenTags:
-            cleanedPos = readerMap[Position]
-            mouseTrackers.append(MouseTracker(cleanedPos, Tag))
-
+    #open(fileName, "w+").close()
+    bundleTrackers = []
+    for (tag, Position) in mice:
+        mouseList = list(filter(lambda x: x.tag() is tag, mouseTrackers))
+        if len(mouseList) is 0:
+            mouseTrackers.append(MouseTracker(readerMap[Position], tag))
+        else:
+            mouseList[0].updatePosition(readerMap[Position], False)
 
 def process():
     #camera = cv2.VideoCapture(0)
@@ -135,6 +136,8 @@ def process():
                     - Multiple bundles forming nearby each other?
             """
             bundleCount = 0
+            #If any error occurs, scan the entire base and update mouse positions to RFID tags
+            error = False
             for contour in rawContours:
                 if cv2.contourArea(contour) < mouseAreaMin:
                     print("no mouse")
@@ -181,6 +184,7 @@ def process():
                 for proContour in bundleContours:
                     if len(bundleTrackers) == 0:
                         #Handle it next time
+                        error = True
                         break
                     bundle = sortNearestBundles(proContour["center"])[0]
                     bundle["position"] = proContour["center"]
@@ -201,6 +205,7 @@ def process():
                         #This is a previously created bundle! (Mice in a bundle have same position as bundle center)
                         print(bundleTrackers)
                         if len(bundleTrackers)==0:
+                            error = True
                             break
                         bundle = sortNearestBundles(proContour["center"])[0]
                         bundle["position"] = proContour["center"]
@@ -213,6 +218,7 @@ def process():
                         mice = []
                         print(len(remainingMice))
                         if len(remainingMice) < 2:
+                            error = True
                             break
                         mice.append(nearestMice[0])
                         #This mouse *has* to be in remaining mice, otherwise it is both the closest
@@ -264,11 +270,12 @@ def process():
                             break
                     if tag is False:
                         #Try again next time
+                        error = True
                         break
                     tag = tag[0]
                     mouseList = list(filter(lambda x: x.tag() is tag, mouseTrackers))
                     if len(mouseList) is 0:
-                        mouseTrackers.append(MouseTracker(index, tag))
+                        mouseTrackers.append(MouseTracker(readerMap[index], tag))
                         mouseList = list(filter(lambda x: x.tag() is tag, mouseTrackers))
                         mouseList[0].updatePosition(readerMap[index], False)
                     else:
@@ -289,6 +296,9 @@ def process():
                             bundle["processed"] = False
                         else:
                             bundleTrackers.remove(bundle)
+            if error:
+                #Refresh from RFID
+                setup()
             for mouse in mouseTrackers:
                 pos = mouse.getPosition()
                 file = open(fileName, 'a')
