@@ -2,6 +2,7 @@
 import datetime
 import imutils
 import time
+import argparse
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 import cv2
@@ -16,6 +17,7 @@ bundleTrackers = list()
 prevBundledMice = 0
 maxMovement = 30
 fileName = "test.txt"
+trialName = None
 
 # TODO: Find these numbers
 readerMap = [
@@ -169,8 +171,7 @@ def process():
                     cv2.drawContours(frame, [box], 0, (0, 0, 255),2)
 
 
-            cv2.imshow("Mouse Tracking", thresh)
-            key = cv2.waitKey(1)& 0xFF
+            
             # clear stream to prepare for next frame
             rawFrame.truncate(0)
             prevFreeMice = list(filter(lambda x: not x.bundled, mouseTrackers))
@@ -293,16 +294,21 @@ def process():
                     #Remove any unprocessed bundles (these are now empty)
                     for bundle in bundleTrackers:
                         if bundle["processed"]:
-                            bundle["processed"] = False
+                                bundle["processed"] = False
                         else:
                             bundleTrackers.remove(bundle)
             if error:
                 #Refresh from RFID
                 setup()
+            cv2.imshow("Mouse Tracking", frame)
+
+            key = cv2.waitKey(1)& 0xFF
+            frameName = "tracking_system:" + trialName + str(time.time()) + ".png"
+            cv2.imwrite("frameData/" + frameName, frame)
             for mouse in mouseTrackers:
                 pos = mouse.getPosition()
                 file = open(fileName, 'a')
-                log = str('%.4f' %time.time()) + ';' + '[' + str(mouse.tag()) + ']' + ';' + str(pos) + '\n'
+                log = str('%.4f' %time.time()) + ';' + '[' + str(mouse.tag()) + ']' + ';' + str(pos) +';' + frameName + '\n'
                 file.write(log)
                 file.close()
                 
@@ -316,6 +322,15 @@ def process():
 
         
 if __name__=="__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-t", "--text", help="path to the text file")
+    ap.add_argument("-n", "--name", default ="base_tracking", help="trial name")
+    args = vars(ap.parse_args())
+    
+    if args.get("text", None) is not None:
+        fileName = args.get('text')
+        open(fileName, "w+").close()
+    trialName = args.get("name")    
     print('hello')
     #setup()
     process()
