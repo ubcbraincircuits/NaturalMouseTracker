@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import RFID_Reader
 from MouseTracker import MouseTracker
-mouseAreaMin = 4500
+mouseAreaMin = 3000
 mouseAreaMax = 15000 #avoid recognizing thicc mice as multiple mice
 #Main Loop
 mouseTrackers = list()
@@ -50,7 +50,6 @@ def setup():
     """
     Adds all mice that can be read by the reader to the trackers.
     """
-    print("setup start")
     mice = RFID_Reader.scan()
     print("done scan")
     seenTags = []
@@ -98,7 +97,8 @@ def process():
 
             #Compute difference between current and first frame, fill in holes, and find contours
             frameDelta = cv2.absdiff(firstFrame, gray)
-            thresh = cv2.threshold(frameDelta, 100, 255, cv2.THRESH_BINARY)[1]
+            thresh = cv2.threshold(frameDelta, 60, 255, cv2.THRESH_BINARY)[1]
+            #thresh = cv2.adaptiveThreshold(frameDelta, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 0)
             thresh = cv2.dilate(thresh, None, iterations=2)
             
             # thresh = bgsub.apply(frame, learningRate = 0.2)
@@ -180,14 +180,16 @@ def process():
                     mouse = sortNearestFree(proContour["center"])[0]
                     mouse.updatePosition(proContour["center"], False)
                 for proContour in bundleContours:
-                    if len(bundleTrackers) == 0:
+                    try:
+                        bundle = sortNearestBundles(proContour["center"])[0]
+                        bundle["position"] = proContour["center"]
+                        for mouse in bundle["mice"]:
+                            mouse.updatePosition(proContour["center"], True)
+                    except Exception as e:
                         #Handle it next time
                         error = True
                         break
-                    bundle = sortNearestBundles(proContour["center"])[0]
-                    bundle["position"] = proContour["center"]
-                    for mouse in bundle["mice"]:
-                        mouse.updatePosition(proContour["center"], True)
+                    
             elif len(freeMouseContours) < len(prevFreeMice):
                 print("bundle")
                 #Some mice have joined new bundles.
@@ -236,28 +238,34 @@ def process():
                             error = True
                 #Now any remaining mice must be in a bundle.
                 for mouse in remainingMice:
-                    if len(bundleContours) is 0 or len(bundleTrackers) is 0:
-                       #Mouse has left
-                        print("mouse left")
-                        mouseTrackers.remove(mouse)
-                        continue
-                    nearestBundle = min(bundleContours, key=lambda x: mouse.distanceFromPos(x["center"]))
-                    if mouse.distanceFromPos(nearestBundle["center"]) > maxMovement:
-                        #Mouse has left (or we lost it)
-                        print("mouse left")
-                        mouseTrackers.remove(mouse)
-                        continue
-                    mouse.updatePosition(nearestBundle["center"], True)
-                    bundle = sortNearestBundles(proContour["center"])[0]
-                    bundle["mice"].append(mouse)
+                    try:
+                        if len(bundleContours) is 0 or len(bundleTrackers) is 0:
+                           #Mouse has left
+                            print("mouse left")
+                            mouseTrackers.remove(mouse)
+                            continue
+                        nearestBundle = min(bundleContours, key=lambda x: mouse.distanceFromPos(x["center"]))
+                        if mouse.distanceFromPos(nearestBundle["center"]) > maxMovement:
+                            #Mouse has left (or we lost it)
+                            print("mouse left")
+                            mouseTrackers.remove(mouse)
+                            continue
+                        mouse.updatePosition(nearestBundle["center"], True)
+                        bundle = sortNearestBundles(proContour["center"])[0]
+                        bundle["mice"].append(mouse)
+                    except Exception as e:
+                        error = true
             elif len(freeMouseContours) > len(prevFreeMice):
                 print("separate")
                 #Some mice have left their bundles, or new mice have arrived.
                 for mouse in prevFreeMice:
-                    nearestContour = sorted(freeMouseContours, key=lambda x: mouse.distanceFromPos(x["center"]))[0]
-                    mouse.updatePosition(nearestContour["center"], False)
-                    processedContours.remove(nearestContour)
-                    freeMouseContours.remove(nearestContour)
+                    try:
+                        nearestContour = sorted(freeMouseContours, key=lambda x: mouse.distanceFromPos(x["center"]))[0]
+                        mouse.updatePosition(nearestContour["center"], False)
+                        processedContours.remove(nearestContour)
+                        freeMouseContours.remove(nearestContour)
+                    except Exception as e:
+                        error = True
                 for contour in freeMouseContours:
                     #Update mouse with tag
                     x2 = contour["center"][0]
@@ -273,7 +281,7 @@ def process():
                         index = readerMap.index(nearestReaders[num])
                         tag = RFID_Reader.readTag(17 - index)
                         count+= 1
-                        if count > 7:
+                        if count > 3:
                             break
                     if tag is False:
                         #Try again next time
