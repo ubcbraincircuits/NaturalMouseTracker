@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import RFID_Reader
 from MouseTracker import MouseTracker
-mouseAreaMin = 500
+mouseAreaMin = 3500
 mouseAreaMax = 15000 #avoid recognizing thicc mice as multiple mice
 #Main Loop
 mouseTrackers = list()
@@ -98,7 +98,7 @@ def process():
 
             #Compute difference between current and first frame, fill in holes, and find contours
             frameDelta = cv2.absdiff(firstFrame, gray)
-            thresh = cv2.threshold(frameDelta, 35, 255, cv2.THRESH_BINARY)[1]
+            thresh = cv2.threshold(frameDelta, 60, 255, cv2.THRESH_BINARY)[1]
             #thresh = cv2.adaptiveThreshold(frameDelta, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 0)
             
             #Watershed
@@ -120,7 +120,7 @@ def process():
             
             # thresh = bgsub.apply(frame, learningRate = 0.2)
           
-            (rawContours, _) = cv2.findContours(sure_fg.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            (rawContours, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             
 
@@ -191,14 +191,14 @@ def process():
                     cv2.drawContours(frame, [box], 0, (0, 0, 255),2)
 
 
-            processedContours = []            
+            #processedContours = []           
             
             prevFreeMice = list(filter(lambda x: not x.bundled, mouseTrackers))
             freeMouseContours = list(filter(lambda x: not x["bundle"], processedContours))
             bundleContours = list(filter(lambda x: x['bundle'], processedContours))
             if len(freeMouseContours) ==len(prevFreeMice):
                 diffFrameCount = 0
-                #Simple. Update all mice with their new location
+                #Simple. Update all mice with thei new location
                 for proContour in freeMouseContours:
                     mouse = sortNearestFree(proContour["center"])[0]
                     mouse.updatePosition(proContour["center"], False)
@@ -355,9 +355,9 @@ def process():
                 log = str('%.4f' %time.time()) + ';' + '[' + str(mouse.tag()) + ']' + ';' + str(pos) +';' + frameName + '\n'
                 file.write(log)
                 file.close()
-            cv2.imshow("Mouse Tracking", sure_fg)
+            cv2.imshow("Mouse Tracking", frame)
             key = cv2.waitKey(1)& 0xFF
-            cv2.imwrite("frameData/" + frameName, frame)
+            cv2.imwrite("FrameData/" + frameName, frame)
             
                 
             if key==ord('q'):
