@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import RFID_Reader
 from MouseTracker import MouseTracker
-mouseAreaMin = 3000
+mouseAreaMin = 500
 mouseAreaMax = 15000 #avoid recognizing thicc mice as multiple mice
 #Main Loop
 mouseTrackers = list()
@@ -72,9 +72,10 @@ def process():
     time.sleep(0.25)
     firstFrame = cv2.imread("ref.jpg")
     firstFrame = cv2.cvtColor(firstFrame, cv2.COLOR_BGR2GRAY)
-    firstFrame = cv2.GaussianBlur(firstFrame, (21,21), 0)
+    #firstFrame = cv2.GaussianBlur(firstFrame, (21,21), 0)
     bgsub = cv2.bgsegm.createBackgroundSubtractorGMG()
     startUpIterations = 100
+    diffFrameCount = 0
     frameCount = 0
     for rawFrame in camera.capture_continuous(rawCapture, format = "bgr", use_video_port=True):
         try:
@@ -97,15 +98,37 @@ def process():
 
             #Compute difference between current and first frame, fill in holes, and find contours
             frameDelta = cv2.absdiff(firstFrame, gray)
-            thresh = cv2.threshold(frameDelta, 60, 255, cv2.THRESH_BINARY)[1]
+            thresh = cv2.threshold(frameDelta, 35, 255, cv2.THRESH_BINARY)[1]
             #thresh = cv2.adaptiveThreshold(frameDelta, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 0)
-            thresh = cv2.dilate(thresh, None, iterations=2)
+            
+            #Watershed
+            kernel = np.ones((10, 10), np.uint8)
+            opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN,kernel, iterations = 3)
+            
+            #Determining sure background area
+            sure_bg = cv2.dilate(opening, kernel, iterations=3)
+            
+            #Determining sure foreground area
+            dist_trans = cv2.distanceTransform(opening, cv2.DIST_L2, 5)
+            sure_fg = cv2.threshold(dist_trans,0.6*dist_trans.max(),255, 0)[1]           
+            
+            #Unknown region
+            sure_fg = np.uint8(sure_fg)
+            unknown = cv2.subtract(sure_bg, sure_fg)
+            
+            #thresh = cv2.dilate(thresh, None, iterations=2)
             
             # thresh = bgsub.apply(frame, learningRate = 0.2)
           
-            (rawContours, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            (rawContours, _) = cv2.findContours(sure_fg.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            processedContours = list()
+            
+
+            processedContours = list()# clear stream to prepare for next frame
+            rawFrame.truncate(0)
+            
+            
+            
             """
             Capstone process:
                 If area of contour is bigger than min, it must be at least one mouse.
@@ -168,13 +191,13 @@ def process():
                     cv2.drawContours(frame, [box], 0, (0, 0, 255),2)
 
 
+            processedContours = []            
             
-            # clear stream to prepare for next frame
-            rawFrame.truncate(0)
             prevFreeMice = list(filter(lambda x: not x.bundled, mouseTrackers))
             freeMouseContours = list(filter(lambda x: not x["bundle"], processedContours))
             bundleContours = list(filter(lambda x: x['bundle'], processedContours))
             if len(freeMouseContours) ==len(prevFreeMice):
+                diffFrameCount = 0
                 #Simple. Update all mice with their new location
                 for proContour in freeMouseContours:
                     mouse = sortNearestFree(proContour["center"])[0]
@@ -191,7 +214,12 @@ def process():
                         break
                     
             elif len(freeMouseContours) < len(prevFreeMice):
+                diffFrameCount += 1
                 print("bundle")
+                if diffFrameCount <= 5:
+                    #Ignore frames of mice briefly passing by each other.
+                    #Slows the algorithm significantly to process these.
+                    continue
                 #Some mice have joined new bundles.
                 #For free mice, simple. Update all the remaining free mice.
                 remainingMice = mouseTrackers.copy()
@@ -256,6 +284,9 @@ def process():
                     except Exception as e:
                         error = true
             elif len(freeMouseContours) > len(prevFreeMice):
+                diffFrameCount += 1
+                if diffFrameCount <= 5:
+                    continue
                 print("separate")
                 #Some mice have left their bundles, or new mice have arrived.
                 for mouse in prevFreeMice:
@@ -324,7 +355,7 @@ def process():
                 log = str('%.4f' %time.time()) + ';' + '[' + str(mouse.tag()) + ']' + ';' + str(pos) +';' + frameName + '\n'
                 file.write(log)
                 file.close()
-            cv2.imshow("Mouse Tracking", frame)
+            cv2.imshow("Mouse Tracking", sure_fg)
             key = cv2.waitKey(1)& 0xFF
             cv2.imwrite("frameData/" + frameName, frame)
             
