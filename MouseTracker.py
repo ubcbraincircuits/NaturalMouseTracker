@@ -7,7 +7,7 @@ class MouseTracker:
         self.id = id
         self.bundled = False
 
-    def updatePosition(self, coordinate, isBundle):
+    def updatePosition(self, coordinate, isBundle=False):
         self.prevCoord = self.currCoord
         self.currCoord = coordinate
         self.bundled = isBundle
