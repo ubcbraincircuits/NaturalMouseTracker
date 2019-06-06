@@ -138,6 +138,8 @@ def YOLO(trialName, mice, RFID):
                             tracker.recordedPositions.extend(nearestTracker.recordedPositions)
                             lostTrackers.remove(tracker)
                             anonymousTrackers.remove(nearestTracker)
+            if len(lostTrackers) == 0:
+                error = False
         cv2.imshow('Demo', image)
         cv2.waitKey(3)
     cap.release()
