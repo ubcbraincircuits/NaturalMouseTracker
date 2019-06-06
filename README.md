@@ -9,8 +9,7 @@ reader, which then interface with the Raspberry Pi over I2C.
 The tag readers are set up in a 3x6 grid, and cannot be used at the same time unless they are a minimum distance away, lest they interfere.
 
 ## Overhead Camera
-Tracks mice through motion detection, and handles overlapping by referencing the RFID system upon the end of an overlap, or if any error occurs.
+Records data in discrete frames. When all mice are distinct from one another (far apart), then the RFID system is pulsed over each mouse's location. This serves as verification for:
 
-RFID referencing takes about 1.5 seconds, so is done sparingly.
-
-Currently, can accurately track 3 mice in a small environment. 
+## YOLO
+A object detection system using https://pjreddie.com/darknet/yolo/. Stands for "You Only Look Once" - this system is very fast and accurate, and only fails when mice climb completely atop one another, or are obscured from the camera's vision. Main code for this system has been imported from https://github.com/AlexeyAB/darknet, and the API has been used to complete the tracking.
