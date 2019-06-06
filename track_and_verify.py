@@ -61,6 +61,10 @@ def setup():
             mouseTrackers.append(MouseTracker(readerMap[Position], tag))
         else:
             mouseList[0].updatePosition(readerMap[Position], False)
+        file = open(fileName, 'a')
+        log = str(tag) + ';' + str(pos) +';' + "None" + '\n'
+        file.write(log)
+        file.close()
 
 def process():
     #camera = cv2.VideoCapture(0)
@@ -381,7 +385,7 @@ def process():
                 pos = mouse.getPosition()
                 cv2.putText(frame, str(mouse.tag()), pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
                 file = open(fileName, 'a')
-                log = str('%.4f' %time.time()) + ';' + '[' + str(mouse.tag()) + ']' + ';' + str(pos) +';' + frameName + '\n'
+                log = str(mouse.tag()) + ';' + str(pos) +';' + frameName + '\n'
                 file.write(log)
                 file.close()
             cv2.imshow("Mouse Tracking", frame)
