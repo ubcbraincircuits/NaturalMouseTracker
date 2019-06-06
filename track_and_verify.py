@@ -375,7 +375,8 @@ def process():
                 continue
                 #Refresh from RFID
                 #setup()
-            frameName = "tracking_system:" + trialName + str(time.time()) + ".png"
+            frameName = "tracking_system:" + trialName + str(frameCount) + ".png"
+            frameCount += 1
             for mouse in mouseTrackers:
                 pos = mouse.getPosition()
                 cv2.putText(frame, str(mouse.tag()), pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
