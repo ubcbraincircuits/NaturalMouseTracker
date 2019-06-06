@@ -80,7 +80,7 @@ def readNumber(address_1):
         print (e)
     return number1,time.time()
 
-def scan():
+def scan(f = False):
     mice = []
     for i in ProT_arrange:
         Data = Trash_Data
@@ -102,6 +102,8 @@ def scan():
                     #The tag is always 10 characters long
                     number = number[0:10]
                     mice.append((int(number, 16), x))
+                    if f is not False:
+                        f.write (str(int(number, 16))+" "+ProT_Dic[ProT[x]]+" "+str(Time)+"\n")
                 except Exception as e:
                     print(str(e))
     return mice
@@ -120,6 +122,15 @@ def readTag(tagID):
         return (int(number, 16), tagID)
     except Exception as e:
         return False
+
+def record():
+    with open ("RTS_test.txt" , "w") as f:
+        while True::
+            try:
+                scan(f)
+            except KeyboardInterrupt:
+                break
+
 
 if __name__=="__main__":
     var = int(1)
