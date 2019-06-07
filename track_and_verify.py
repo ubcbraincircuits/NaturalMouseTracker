@@ -81,6 +81,7 @@ def process():
     startUpIterations = 100
     diffFrameCount = 0
     frameCount = 0
+    needPulse = False
     for rawFrame in camera.capture_continuous(rawCapture, format = "bgr", use_video_port=True):
         try:
             #Grab the current frame
@@ -200,8 +201,11 @@ def process():
             prevFreeMice = list(filter(lambda x: not x.bundled, mouseTrackers))
             freeMouseContours = list(filter(lambda x: not x["bundle"], processedContours))
             bundleContours = list(filter(lambda x: x['bundle'], processedContours))
-            if len(freeMouseContours) ==len(prevFreeMice):
-                diffFrameCount = 0
+            if len(freeMouseContours) ==len(prevFreeMice) and needPulse:
+                diffFrameCount += 1
+                if diffFrameCount < 15:
+                    #Give enough time for mice to be clearly separated
+                    continue
                 #A good base. Pulse nearby RFIDs to determine mouse positions.
                 for contour in freeMouseContours:
                     #Update mouse with tag
@@ -232,18 +236,13 @@ def process():
                 for proContour in freeMouseContours:
                     mouse = sortNearestFree(proContour["center"])[0]
                     mouse.updatePosition(proContour["center"], False)
-                for proContour in bundleContours:
-                    try:
-                        bundle = sortNearestBundles(proContour["center"])[0]
-                        bundle["position"] = proContour["center"]
-                        for mouse in bundle["mice"]:
-                            mouse.updatePosition(proContour["center"], True)
-                    except Exception as e:
-                        #Handle it next time
-                        error = True
-                        break
+                needPulse = False
 
             elif len(freeMouseContours) < len(prevFreeMice):
+                if len(bundleContours) == 0:
+                    diffFrameCount = 0
+                    #Mice have climbed on top of each other(probably)
+                    needPulse = True
                 # diffFrameCount += 1
                 # print("bundle")
                 # if diffFrameCount <= 5:
@@ -314,6 +313,7 @@ def process():
                 #     except Exception as e:
                 #         error = true
             elif len(freeMouseContours) > len(prevFreeMice):
+                pass
                 # diffFrameCount += 1
                 # if diffFrameCount <= 5:
                 #     continue
