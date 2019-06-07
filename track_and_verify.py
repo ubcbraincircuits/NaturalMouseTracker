@@ -168,6 +168,7 @@ def process():
             bundleCount = 0
             #If any error occurs, scan the entire base and update mouse positions to RFID tags
             error = False
+            updated = False
             for contour in rawContours:
                 if cv2.contourArea(contour) < mouseAreaMin:
                     #Not a mouse :(
@@ -237,6 +238,7 @@ def process():
                     mouse = sortNearestFree(proContour["center"])[0]
                     mouse.updatePosition(proContour["center"], False)
                 needPulse = False
+                updated = True
 
             elif len(freeMouseContours) < len(prevFreeMice):
                 if len(bundleContours) == 0:
@@ -381,13 +383,14 @@ def process():
                 #setup()
             frameName = "tracking_system:" + trialName + str(frameCount) + ".png"
             frameCount += 1
-            for mouse in mouseTrackers:
-                pos = mouse.getPosition()
-                cv2.putText(frame, str(mouse.tag()), pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-                file = open(fileName, 'a')
-                log = str(mouse.tag()) + ';' + str(pos) +';' + frameName + '\n'
-                file.write(log)
-                file.close()
+            if updated:
+                for mouse in mouseTrackers:
+                    pos = mouse.getPosition()
+                    cv2.putText(frame, str(mouse.tag()), pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                    file = open(fileName, 'a')
+                    log = str(mouse.tag()) + ';' + str(pos) +';' + frameName + '\n'
+                    file.write(log)
+                    file.close()
             cv2.imshow("Mouse Tracking", frame)
             key = cv2.waitKey(1)& 0xFF
             cv2.imwrite("FrameData/" + frameName, frame)
