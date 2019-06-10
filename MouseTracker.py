@@ -1,8 +1,12 @@
+"""
+Tracking file. Copy into the darknet folder for processing.
+"""
+
 import numpy as np
 class MouseTracker:
 
     def __init__(self, startCoord, id):
-        self.prevCoord = startCoord
+        self.currCoord = startCoord
         self.recordedPositions = [startCoord]
         self.id = id
         self.bundled = False

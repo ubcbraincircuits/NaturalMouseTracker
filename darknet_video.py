@@ -113,7 +113,7 @@ def YOLO(trialName, mice, RFID):
         image = cvDrawBoxes(detections, frame_resized)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         # print(1/(time.time()-prev_time))
-
+        updatedTrackers = []
         for detection in detections:
 
             x = detection[2][0]
@@ -123,12 +123,12 @@ def YOLO(trialName, mice, RFID):
             nearestTracker.updatePosition(position)
         if len(detections) < len(mice):
             error = True
-            for tracker in filter(lambda x: x not in updatedTrackers, mouseTrackers):
+            for tracker in filter(lambda x: x not in updatedTrackers, mice):
                 lostTrackers.append(tracker)
-                mouseTrackers.remove(tracker)
-                mouseTrackers.append(MouseTracker(tracker.getPosition(), None))
-        if error = True:
-            anonymousTrackers = list(filter(lambda x: x.tag() is None, mouseTrackers))
+                mice.remove(tracker)
+                mice.append(MouseTracker(tracker.getPosition(), None))
+        if error == True:
+            anonymousTrackers = list(filter(lambda x: x.tag() is None, mice))
             for line in RFID:
                 ln = line.split(';')
                 if ln[2] is frameName:
@@ -147,6 +147,10 @@ def YOLO(trialName, mice, RFID):
 
 if __name__ == "__main__":
     mouseTrackers = []
+    #temp
+    mouseTrackers.append(MouseTracker((341, 266), 1))
+    mouseTrackers.append(MouseTracker((210, 166), 2))
+    mouseTrackers.append(MouseTracker((172, 82), 3))
     fileName = "test.txt"
     file = open(fileName, "r")
     RFIDResponses = file.readlines()
