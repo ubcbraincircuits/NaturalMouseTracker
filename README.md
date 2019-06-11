@@ -1,5 +1,5 @@
 # MouseTrackingSystem
-A system for using RFID tags and a overhead camera to track multiple mouse movement within a small environment.
+A system for using RFID tags and computer vision to track multiple mouse movement within a small environment.
 
 ## RFID System
 Uses 18 ProTrinkets to interface with their own ID-20LA RFID tag
