@@ -394,7 +394,7 @@ def process():
                     file.close()
             cv2.imshow("Mouse Tracking", thresh)
             key = cv2.waitKey(1)& 0xFF
-            cv2.imwrite("frameData/" + frameName, frame)
+            cv2.imwrite("frameData/" + frameName, gray)
 
 
             if key==ord('q'):
