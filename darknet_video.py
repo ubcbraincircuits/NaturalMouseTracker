@@ -106,7 +106,7 @@ def YOLO(trialName, mice, RFID):
         try:
             print("count:", frameCount)
             prev_time = time.time()
-            frameName = "frameData/trackingsystem" + trialName + str(frameCount).zfill(5) + ".png"
+            frameName = "frameData/tracking_system" + trialName + str(frameCount) + ".png"
             frame_read = cv2.imread(frameName)
             frameCount += 1
             frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
@@ -190,4 +190,4 @@ if __name__ == "__main__":
     dataFileName = "test.txt"
     file = open(dataFileName, "r")
     RFIDResponses = file.readlines()
-    YOLO("trial", mouseTrackers, RFIDResponses)
+    YOLO("train", mouseTrackers, RFIDResponses)
