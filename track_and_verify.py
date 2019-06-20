@@ -382,7 +382,7 @@ def process():
                 continue
                 #Refresh from RFID
                 #setup()
-            frameName = "tracking_system:" + trialName + str(frameCount) + ".png"
+            frameName = "tracking_system" + trialName + str(frameCount) + ".png"
             frameCount += 1
             if updated:
                 for mouse in mouseTrackers:
