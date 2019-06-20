@@ -11,7 +11,7 @@ import RFID_Reader
 from time import sleep
 from MouseTracker import MouseTracker
 mouseAreaMin = 3500
-mouseAreaMax = 14000 #avoid recognizing thicc mice as multiple mice
+mouseAreaMax = 15000 #avoid recognizing thicc mice as multiple mice
 #Main Loop
 mouseTrackers = list()
 bundleTrackers = list()
@@ -120,7 +120,7 @@ def process():
 
             #Compute difference between current and first frame, fill in holes, and find contours
             frameDelta = cv2.absdiff(firstFrame, gray)
-            thresh = cv2.threshold(frameDelta, 50, 255, cv2.THRESH_BINARY)[1]
+            thresh = cv2.threshold(frameDelta, 60, 255, cv2.THRESH_BINARY)[1]
             #thresh = cv2.adaptiveThreshold(frameDelta, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 0)
 
             #Watershed
@@ -408,9 +408,9 @@ def process():
                     log = str(mouse.tag()) + ';' + str(pos) +';' + frameName + '\n'
                     file.write(log)
                     file.close()
-            cv2.imshow("Mouse Tracking", gray)
+            cv2.imshow("Mouse Tracking", frame)
             key = cv2.waitKey(1)& 0xFF
-            cv2.imwrite("frameData/" + frameName, gray)
+            #cv2.imwrite("frameData/" + frameName, gray)
 
 
             if key==ord('q'):
