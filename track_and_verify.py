@@ -72,7 +72,8 @@ def process():
     camera = PiCamera()
     camera.resolution = (640, 480)
     camera.framerate = 30
-    camera.exposure_mode="night"
+    camera.iso =600
+    camera.exposure_mode="off"
     rawCapture = PiRGBArray(camera, size=(640, 480))
 
     time.sleep(0.25)
@@ -392,7 +393,7 @@ def process():
                     log = str(mouse.tag()) + ';' + str(pos) +';' + frameName + '\n'
                     file.write(log)
                     file.close()
-            cv2.imshow("Mouse Tracking", thresh)
+            cv2.imshow("Mouse Tracking", gray)
             key = cv2.waitKey(1)& 0xFF
             cv2.imwrite("frameData/" + frameName, gray)
 
