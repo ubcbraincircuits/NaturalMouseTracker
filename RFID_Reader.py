@@ -125,7 +125,7 @@ def readTag(tagID):
 
 def record():
     with open ("RTS_test.txt" , "w") as f:
-        while True::
+        while True:
             try:
                 scan(f)
             except KeyboardInterrupt:

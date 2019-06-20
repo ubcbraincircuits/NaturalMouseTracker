@@ -8,6 +8,7 @@ from picamera import PiCamera
 import cv2
 import numpy as np
 import RFID_Reader
+from time import sleep
 from MouseTracker import MouseTracker
 mouseAreaMin = 3500
 mouseAreaMax = 15000 #avoid recognizing thicc mice as multiple mice
@@ -51,7 +52,7 @@ def setup():
     Adds all mice that can be read by the reader to the trackers.
     """
     mice = RFID_Reader.scan()
-    print("done scan")
+    print("done scan, mouse count:", mice)
     seenTags = []
     #open(fileName, "w+").close()
     bundleTrackers = []
@@ -62,7 +63,7 @@ def setup():
         else:
             mouseList[0].updatePosition(readerMap[Position], False)
         file = open(fileName, 'a')
-        log = str(tag) + ';' + str(pos) +';' + "None" + '\n'
+        log = str(tag) + ';' + str(Position) +';' + "None" + '\n'
         file.write(log)
         file.close()
 
@@ -70,14 +71,14 @@ def process():
     #camera = cv2.VideoCapture(0)
     camera = PiCamera()
     camera.resolution = (640, 480)
-    camera.framerate = 32
+    camera.framerate = 30
+    camera.exposure_mode="night"
     rawCapture = PiRGBArray(camera, size=(640, 480))
 
     time.sleep(0.25)
     firstFrame = cv2.imread("ref.jpg")
     firstFrame = cv2.cvtColor(firstFrame, cv2.COLOR_BGR2GRAY)
     #firstFrame = cv2.GaussianBlur(firstFrame, (21,21), 0)
-    bgsub = cv2.bgsegm.createBackgroundSubtractorGMG()
     startUpIterations = 100
     diffFrameCount = 0
     frameCount = 0
@@ -95,7 +96,7 @@ def process():
             #frame = imutils.resize(frame, width = 500)
             frame = rawFrame.array
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (21,21), 0)
+            #gray = cv2.GaussianBlur(gray, (21,21), 0)
 
             if firstFrame is None:
                 # TODO: Add separate background image handling
@@ -103,7 +104,7 @@ def process():
 
             #Compute difference between current and first frame, fill in holes, and find contours
             frameDelta = cv2.absdiff(firstFrame, gray)
-            thresh = cv2.threshold(frameDelta, 60, 255, cv2.THRESH_BINARY)[1]
+            thresh = cv2.threshold(frameDelta, 50, 255, cv2.THRESH_BINARY)[1]
             #thresh = cv2.adaptiveThreshold(frameDelta, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 0)
 
             #Watershed
@@ -125,7 +126,7 @@ def process():
 
             # thresh = bgsub.apply(frame, learningRate = 0.2)
 
-            (rawContours, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            (_, rawContours, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
 
 
@@ -391,7 +392,7 @@ def process():
                     log = str(mouse.tag()) + ';' + str(pos) +';' + frameName + '\n'
                     file.write(log)
                     file.close()
-            cv2.imshow("Mouse Tracking", frame)
+            cv2.imshow("Mouse Tracking", thresh)
             key = cv2.waitKey(1)& 0xFF
             cv2.imwrite("frameData/" + frameName, frame)
 
@@ -416,7 +417,7 @@ if __name__=="__main__":
         open(fileName, "w+").close()
     trialName = args.get("name")
     print('hello')
-    #setup()
+    setup()
     process()
 
         # for proContour in list(filter(lambda x: x['bundle'], processedContours)):
