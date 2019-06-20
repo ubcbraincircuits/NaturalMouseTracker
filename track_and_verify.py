@@ -11,7 +11,7 @@ import RFID_Reader
 from time import sleep
 from MouseTracker import MouseTracker
 mouseAreaMin = 3500
-mouseAreaMax = 15000 #avoid recognizing thicc mice as multiple mice
+mouseAreaMax = 14000 #avoid recognizing thicc mice as multiple mice
 #Main Loop
 mouseTrackers = list()
 bundleTrackers = list()
@@ -51,21 +51,36 @@ def setup():
     """
     Adds all mice that can be read by the reader to the trackers.
     """
-    mice = RFID_Reader.scan()
-    print("done scan, mouse count:", mice)
-    seenTags = []
-    #open(fileName, "w+").close()
-    bundleTrackers = []
-    for (tag, Position) in mice:
-        mouseList = list(filter(lambda x: x.tag() == tag, mouseTrackers))
-        if len(mouseList) is 0:
-            mouseTrackers.append(MouseTracker(readerMap[Position], tag))
-        else:
-            mouseList[0].updatePosition(readerMap[Position], False)
-        file = open(fileName, 'a')
-        log = str(tag) + ';' + str(Position) +';' + "None" + '\n'
+    scan = True
+    camera = PiCamera()
+    camera.resolution = (640, 480)
+    camera.framerate = 30
+    camera.iso =600
+    camera.exposure_mode="off"
+    while scan:
+        mice = RFID_Reader.scan()
+        camera.capture("startup.png")
+        for (tag, Position) in mice:
+            mouseList = list(filter(lambda x: x.tag() == tag, mouseTrackers))
+            if len(mouseList) is 0:
+                mouseTrackers.append(MouseTracker(readerMap[Position], tag))
+            else:
+                mouseList[0].updatePosition(readerMap[Position], False)
+        frame = cv2.imread("startup.png")
+        for mouse in mouseTrackers:
+            cv2.circle(frame, mouse.getPosition(), 5, [0,0,255])
+        cv2.imshow("Startup", frame)
+        cv2.waitKey()
+        temp = input("RFID detects " + str(len(mouseTrackers)) + " mice in these positions. Is this accurate? (Y/N)")
+        if temp.lower()[0] == 'y':
+            scan = False
+    file = open("startup.txt", 'w+')
+    for mouse in mouseTrackers:
+        log = str(mouse.tag()) + ';' + str(mouse.getPosition()) +';' + "startup.png" + '\n'
         file.write(log)
-        file.close()
+    file.close()
+    camera.close()
+    cv2.destroyAllWindows
 
 def process():
     #camera = cv2.VideoCapture(0)

@@ -177,16 +177,17 @@ def YOLO(trialName, mice, RFID):
 if __name__ == "__main__":
     mouseTrackers = []
     #temp
-    mouseTrackers.append(MouseTracker((341, 266), 748204241))
-    mouseTrackers.append(MouseTracker((210, 166), 93112365))
-    mouseTrackers.append(MouseTracker((172, 82), 11118463))
+    #mouseTrackers.append(MouseTracker((341, 266), 748204241))
+    #mouseTrackers.append(MouseTracker((210, 166), 93112365))
+    #mouseTrackers.append(MouseTracker((172, 82), 11118463))
     RFIDResponses = []
-    # fileName = "test.txt"
-    # file = open(fileName, "r")
-    # RFIDResponses = file.readlines()
-    # for response in RFIDResponses:
-    #     ln = line.split(";")
-    #     if ln[2] is not "None":
-    #         mouseTrackers.append((item for item in ln[1].strip('()\n').split(',')), int(ln[0]))
-    #         break
+    fileName = "startup.txt"
+    file = open(fileName, "r")
+    mouseLines = file.readLines()
+    for line in mouseLines:
+        ln = line.split(';')
+        mouseTrackers.append(MouseTracker((item for item in ln[1].strip('()\n').split(',')), int(ln[0])))
+    dataFileName = "test.txt"
+    file = open(dataFileName, "r")
+    RFIDResponses = file.readlines()
     YOLO("trial", mouseTrackers, RFIDResponses)
