@@ -22,9 +22,9 @@ trialName = None
 
 # TODO: Find these numbers
 readerMap = [
-    (67, 115), (160, 113), (268, 113), (375, 118), (480, 127), (570, 136), #1-(1-6) [y-x]
-    (67, 210), (160, 213), (265, 213), (370, 220), (475, 225), (570, 227), #2-(1-6) [y-x]
-    (66, 310), (164, 310), (263, 315), (370, 320), (470, 315), (563, 320)  #3-(1-5) [y-x]
+    (103, 170), (177, 160), (274, 145), (390, 140), (475, 138), (542, 145), #1-(1-6) [y-x]
+    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
+    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
 ]
 
 
@@ -58,14 +58,17 @@ def setup():
     camera.iso =600
     camera.exposure_mode="off"
     while scan:
-        mice = RFID_Reader.scan()
         camera.capture("startup.png")
+        mice = RFID_Reader.scan()
+        print("mice", mice)
+        
         for (tag, Position) in mice:
+            Position = Position
             mouseList = list(filter(lambda x: x.tag() == tag, mouseTrackers))
             if len(mouseList) is 0:
-                mouseTrackers.append(MouseTracker(readerMap[Position], tag))
+                mouseTrackers.append(MouseTracker(readerMap[17 -Position], tag))
             else:
-                mouseList[0].updatePosition(readerMap[Position], False)
+                mouseList[0].updatePosition(readerMap[17 - Position], False)
         frame = cv2.imread("startup.png")
         for mouse in mouseTrackers:
             cv2.circle(frame, mouse.getPosition(), 5, [0,0,255])
@@ -80,7 +83,7 @@ def setup():
         file.write(log)
     file.close()
     camera.close()
-    cv2.destroyAllWindows
+    cv2.destroyAllWindows()
 
 def process():
     #camera = cv2.VideoCapture(0)
@@ -101,15 +104,6 @@ def process():
     needPulse = False
     for rawFrame in camera.capture_continuous(rawCapture, format = "bgr", use_video_port=True):
         try:
-            #Grab the current frame
-            # print("got the frame")
-            # (grabbed, frame) = camera.read()
-            #
-            # #If we could not get the frame, then we have reached the end of the stream.
-            # if not grabbed:
-            #     break;
-            #Convert to grayscale, resize, and blur the frame
-            #frame = imutils.resize(frame, width = 500)
             frame = rawFrame.array
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             #gray = cv2.GaussianBlur(gray, (21,21), 0)
@@ -120,27 +114,7 @@ def process():
 
             #Compute difference between current and first frame, fill in holes, and find contours
             frameDelta = cv2.absdiff(firstFrame, gray)
-            thresh = cv2.threshold(frameDelta, 60, 255, cv2.THRESH_BINARY)[1]
-            #thresh = cv2.adaptiveThreshold(frameDelta, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 0)
-
-            #Watershed
-            kernel = np.ones((10, 10), np.uint8)
-            opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN,kernel, iterations = 3)
-
-            #Determining sure background area
-            sure_bg = cv2.dilate(opening, kernel, iterations=3)
-
-            #Determining sure foreground area
-            dist_trans = cv2.distanceTransform(opening, cv2.DIST_L2, 5)
-            sure_fg = cv2.threshold(dist_trans,0.6*dist_trans.max(),255, 0)[1]
-
-            #Unknown region
-            sure_fg = np.uint8(sure_fg)
-            unknown = cv2.subtract(sure_bg, sure_fg)
-
-            #thresh = cv2.dilate(thresh, None, iterations=2)
-
-            # thresh = bgsub.apply(frame, learningRate = 0.2)
+            thresh = cv2.threshold(frameDelta, 100, 255, cv2.THRESH_BINARY)[1]
 
             (_, rawContours, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -149,39 +123,6 @@ def process():
             processedContours = list()# clear stream to prepare for next frame
             rawFrame.truncate(0)
 
-
-
-            """
-            Capstone process:
-                If area of contour is bigger than min, it must be at least one mouse.
-                If it is less than two mice, it is one.
-                If it is greater than minimum for two mice and less than minimum for three, it is two mice.
-                If it is greater than min. for three, it is three mice.
-                Otherwise, it is not a mouse (something smaller has moved: dust, food, etc.)
-                If any mice have merged, record this.
-                Then, for all contours that are mice, first check for all single mice.
-                Single mice are simple. Find their center and store it in the tracker.
-                Merged mice: very complex.
-            How can we improve this?
-                Idea #1: Simply, don't handle the merge case. At the point the mice merge,
-                we treat them as one "bundle" of mice. *If* we can assume the number of mice in the cage is
-                constant, then this is simple. For situations such as AHF, we can potentially designate
-                a region of the image as an "entrance/exit zone", where we can decrement and increment a
-                global mouse counter.
-                With this, we may not have to have set sizes for the individual sets of mice,
-                which strikes me as a poor idea regardless.
-                A maximum size for a mouse should suffice.
-                Then, whenever the contour count decrements, we check the distance between
-                the bundle and the last known position of the vanished mouse. If it is close enough,
-                assume the mouse has joined the bundle. Otherwise, assume the mouse has left the cage.
-                Whenever a mouse leaves the bundle (i.e. a new contour appears), verify which it is
-                with the RFID system.
-                Possible problems:
-                    - A mouse could leave the cage at the same time as another leaves the bundle.
-                      This system could potentially not notice this.
-                    - The size of mouse bundles could become too large to get meaningful data out of.
-                    - Multiple bundles forming nearby each other?
-            """
             bundleCount = 0
             #If any error occurs, scan the entire base and update mouse positions to RFID tags
             error = False
@@ -221,7 +162,7 @@ def process():
             bundleContours = list(filter(lambda x: x['bundle'], processedContours))
             if len(freeMouseContours) ==len(prevFreeMice) and needPulse:
                 diffFrameCount += 1
-                if diffFrameCount < 15:
+                if diffFrameCount < 50:
                     #Give enough time for mice to be clearly separated
                     continue
                 #A good base. Pulse nearby RFIDs to determine mouse positions.
@@ -237,8 +178,9 @@ def process():
                     index = readerMap.index(nearestReaders[0])
                     tag = RFID_Reader.readTag(17 - index)
                     if tag is False:
-                        #Try again next time
+                        #Try again next time (after a delay)
                         error = True
+                        diffFrameCount = 0
                         break
                     tag = tag[0]
                     mouseList = list(filter(lambda x: x.tag() == tag, mouseTrackers))
@@ -408,9 +350,9 @@ def process():
                     log = str(mouse.tag()) + ';' + str(pos) +';' + frameName + '\n'
                     file.write(log)
                     file.close()
-            cv2.imshow("Mouse Tracking", frame)
+            cv2.imshow("Mouse Tracking", thresh)
             key = cv2.waitKey(1)& 0xFF
-            #cv2.imwrite("frameData/" + frameName, gray)
+            cv2.imwrite("frameData/" + frameName, gray)
 
 
             if key==ord('q'):
