@@ -7,7 +7,8 @@ class MouseTracker:
 
     def __init__(self, startCoord, id):
         self.currCoord = startCoord
-        self.recordedPositions = [startCoord]
+        if startCoord is not (0,0):
+            self.recordedPositions = [startCoord]
         self.id = id
         self.bundled = False
 
