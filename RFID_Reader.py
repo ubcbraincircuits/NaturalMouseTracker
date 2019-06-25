@@ -5,11 +5,20 @@ import RPi.GPIO as GPIO
 import decimal
 from random import shuffle
 from picamera import PiCamera
+from picamera.array import PiRGBArray
+import argparse
+import cv2
 
 #camera = PiCamera()
 
 Trash_Data = [0,255,255,255,255,255,255,255,255,255,255,255]
 ProT = [None]*18
+
+readerMap = [
+    (103, 170), (177, 160), (274, 145), (390, 140), (475, 138), (542, 145), #1-(1-6) [y-x]
+    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
+    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
+]
 
 #Hex I2C Addresses of all ProTrinkets
 ProT [0] = 0x11
@@ -38,15 +47,14 @@ ProT_Dic = {ProT[0]:"1-1",ProT[1]:"1-2",ProT[2]:"1-3",ProT[3]:"1-4",
 #Adapted from ENPH 479 report by Yuan Tian, Ziyue Hu, and Becky Lin
 # Essentially, only readers at least 4 apart can be turned on simultaneously.
 # From testing, this unfortnuately leaves the middle units without a pair.
-Mapping_Dic = { 0: [0, 4], 1: [1, 5], 2: [6, 10], 3:[7, 11],
-                4: [12, 16], 5: [13, 17], 6: [14], 7: [15],
-                8: [8], 9:[9], 10: [2], 11:[3]}
-
-
+#Mapping_Dic = { 0: [0, 4], 1: [1, 5], 2: [6, 10], 3:[7, 11],
+                #4: [12, 16], 5: [13, 17], 6: [14], 7: [15],
+                #8: [8], 9:[9], 10: [2], 11:[3]}
+Mapping_Dic = { 0:[0,17]}
 #ProT_arrange = [i for i in range(0,18)]
 #ProT_arrange = [i for i in range(0,8)]
-ProT_arrange = [i for i in range(0,12)]
-#ProT_arrange = [0,8,6,2,1,7]
+#ProT_arrange = [i for i in range(0,12)]
+ProT_arrange = [0]
 
 #Write a number over the I2C bus.
 #Used to get a reading from the tag reader into the
@@ -80,7 +88,7 @@ def readNumber(address_1):
         print (e)
     return number1,time.time()
 
-def scan(f = False):
+def scan(f = False, frame = 0):
     mice = []
     for i in ProT_arrange:
         Data = Trash_Data
@@ -88,10 +96,9 @@ def scan(f = False):
 
         for x in Mapping_Dic[i]:
             writeNumber(int(1), ProT[x])
-        time.sleep (0.13)
+        time.sleep (0.035)
         for x in Mapping_Dic[i]:
             [Data,Time] = readNumber (ProT[x])
-            time.sleep  (0.01)
             Time = time.time()
             #Data = number1
             if '\r' not in Data:
@@ -103,7 +110,7 @@ def scan(f = False):
                     number = number[0:10]
                     mice.append((int(number, 16), x))
                     if f is not False:
-                        f.write (str(int(number, 16))+" "+ProT_Dic[ProT[x]]+" "+str(Time)+"\n")
+                        f.write (str(int(number, 16))+";"+str(readerMap[x])+";"+str(frame)+"\n")
                 except Exception as e:
                     print(str(e))
     return mice
@@ -125,51 +132,43 @@ def readTag(tagID):
 
 def record():
     with open ("RTS_test.txt" , "w") as f:
-        while True:
+        camera = PiCamera()
+        camera.resolution = (640, 480)
+        camera.framerate = 30
+        camera.iso =600
+        camera.exposure_mode="off"
+        rawCapture = PiRGBArray(camera, size=(640, 480))
+
+        time.sleep(0.25)
+        firstFrame = cv2.imread("ref.jpg")
+        firstFrame = cv2.cvtColor(firstFrame, cv2.COLOR_BGR2GRAY)
+        #firstFrame = cv2.GaussianBlur(firstFrame, (21,21), 0)
+        startUpIterations = 100
+        diffFrameCount = 0
+        frameCount = 0
+        needPulse = False
+        for rawFrame in camera.capture_continuous(rawCapture, format = "bgr", use_video_port=True):
             try:
-                scan(f)
+                frameName = "tracking_system" + trialName + str(frameCount) + ".png"
+                frameCount += 1
+                frame = rawFrame.array
+                rawFrame.truncate(0)
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                cv2.imshow("Mouse Tracking", gray)
+                key = cv2.waitKey(1)& 0xFF
+                cv2.imwrite("frameData/" + frameName, gray)
+                mice = scan(f, frameName)
             except KeyboardInterrupt:
                 break
 
-
 if __name__=="__main__":
-    var = int(1)
-    number1 = []
-    #camera.capture ('/home/pi/Tracking_system/mouse_cage_tracking_pic.jpg')
-    time.sleep(15)
-    t0 = time.time()
-    t = time.time()
-    for j in range(10):
-        #camera.resolution = (500,312)
-        #camera.framerate = 30
-        #camera.start_recording ('/home/pi/Tracking_system/mouse_cage_tracking_vid.h264')
-        with open ("RTS_test.txt" , "w") as f:
-            f.write (str(t0)+"\n")
-            while t-t0<500:
-                t=time.time()
-                for i in ProT_arrange:
-                    Data = Trash_Data
-                    #time.sleep(0.01)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-t", "--text", help="path to the text file")
+    ap.add_argument("-n", "--name", default ="base_tracking", help="trial name")
+    args = vars(ap.parse_args())
 
-                    for x in Mapping_Dic[i]:
-                        writeNumber(var, ProT[x])
-                    time.sleep (0.13)
-                    for x in Mapping_Dic[i]:
-                        [Data,Time] = readNumber (ProT[x])
-                        time.sleep  (0.01)
-                        Time = time.time()
-                        #Data = number1
-                        if '\r' not in Data:
-                            Data = []
-                        if (Data != Trash_Data and Data != []):
-                            try:
-                                number =  ''.join(Data)
-                                #The tag is always 10 characters long
-                                number = number[0:10]
-                                f.write (str(int(number, 16))+" "+ProT_Dic[ProT[x]]+" "+str(Time)+"\n")
-                                print (ProT_Dic[ProT[x]])
-                                print (Data,Time)
-                                print(number, int(number, 16))
-                            except Exception as e:
-                                print(str(e))
-        #camera.stop_recording()
+    if args.get("text", None) is not None:
+        fileName = args.get('text')
+        open(fileName, "w+").close()
+    trialName = args.get("name")
+    record()
