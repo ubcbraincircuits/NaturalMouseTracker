@@ -58,14 +58,17 @@ def setup():
     camera.iso =600
     camera.exposure_mode="off"
     while scan:
-        mice = RFID_Reader.scan()
         camera.capture("startup.png")
+        mice = RFID_Reader.scan()
+        print("mice", mice)
+        
         for (tag, Position) in mice:
+            Position = Position
             mouseList = list(filter(lambda x: x.tag() == tag, mouseTrackers))
             if len(mouseList) is 0:
-                mouseTrackers.append(MouseTracker(readerMap[Position], tag))
+                mouseTrackers.append(MouseTracker(readerMap[17 -Position], tag))
             else:
-                mouseList[0].updatePosition(readerMap[Position], False)
+                mouseList[0].updatePosition(readerMap[17 - Position], False)
         frame = cv2.imread("startup.png")
         for mouse in mouseTrackers:
             cv2.circle(frame, mouse.getPosition(), 5, [0,0,255])
@@ -80,7 +83,7 @@ def setup():
         file.write(log)
     file.close()
     camera.close()
-    cv2.destroyAllWindows
+    cv2.destroyAllWindows()
 
 def process():
     #camera = cv2.VideoCapture(0)
@@ -111,7 +114,7 @@ def process():
 
             #Compute difference between current and first frame, fill in holes, and find contours
             frameDelta = cv2.absdiff(firstFrame, gray)
-            thresh = cv2.threshold(frameDelta, 60, 255, cv2.THRESH_BINARY)[1]
+            thresh = cv2.threshold(frameDelta, 100, 255, cv2.THRESH_BINARY)[1]
 
             (_, rawContours, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -175,8 +178,9 @@ def process():
                     index = readerMap.index(nearestReaders[0])
                     tag = RFID_Reader.readTag(17 - index)
                     if tag is False:
-                        #Try again next time
+                        #Try again next time (after a delay)
                         error = True
+                        diffFrameCount = 0
                         break
                     tag = tag[0]
                     mouseList = list(filter(lambda x: x.tag() == tag, mouseTrackers))
@@ -346,9 +350,9 @@ def process():
                     log = str(mouse.tag()) + ';' + str(pos) +';' + frameName + '\n'
                     file.write(log)
                     file.close()
-            cv2.imshow("Mouse Tracking", frame)
+            cv2.imshow("Mouse Tracking", thresh)
             key = cv2.waitKey(1)& 0xFF
-            #cv2.imwrite("frameData/" + frameName, gray)
+            cv2.imwrite("frameData/" + frameName, gray)
 
 
             if key==ord('q'):
