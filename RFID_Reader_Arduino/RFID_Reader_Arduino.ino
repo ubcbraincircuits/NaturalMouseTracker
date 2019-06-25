@@ -1,6 +1,6 @@
 #include <Wire.h>
 
-#define SLAVE_ADDRESS 0x14 
+#define SLAVE_ADDRESS 0x56
 
 const int totalLength = 16;
 char Tag [totalLength];
@@ -10,6 +10,7 @@ volatile byte masterByte = 0;
 volatile boolean flag = false;
 int test [] = {1, 2, 3, 4};
 int index = 0;
+int count = 0;
 
 void setup ()
 {
@@ -18,7 +19,7 @@ void setup ()
   pinMode (2, INPUT_PULLUP);
   pinMode (9, OUTPUT);
   pinMode (A3, OUTPUT);
-  digitalWrite (9, LOW);
+  digitalWrite (9, HIGH);
 
   Wire.begin (SLAVE_ADDRESS);
   Wire.onReceive (receiveData);
@@ -30,27 +31,29 @@ void loop ()
   masterByte = 0;
   receiveData (1);
   Serial.println(masterByte);
-  if (masterByte == 1)
-  {
-    digitalWrite (9, HIGH);
-    while(Serial.available () > 0) {
-        char t  = Serial.read();
-     }
-    delay(125); //Required to give the trinket time to set up, 125 ms at minimum
-    if (Serial.available () > 0)
-    {
+  if (masterByte == 1){
+    delay(20);
+    if (Serial.available () > 0){
       index = 0;
       Serial.readBytesUntil (3, Tag, totalLength - 1);
-      digitalWrite (9, LOW);
     } else {
-        Tag[0] = 0;
-        index = 0;
-        for (int i = 1; i < totalLength; i++) {
-          Tag[i] = 255;
-        }
+      Tag[0] = 0;
+      index = 0;
+      for (int i = 1; i < totalLength; i++) {
+        Tag[i] = 255;
+      }
+    }
+  } else {
+    if (count > 500) {
+      while(Serial.available () > 0) {
+          char t  = Serial.read();
+      }
+      count = 0;
+    } else {
+      count++;
+      delay(1);
     }
   }
-  digitalWrite (9, LOW);
 }
 
 void receiveData (int byteCount)
