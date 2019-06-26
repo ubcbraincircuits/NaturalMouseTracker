@@ -1,4 +1,3 @@
-#from smbus2 import SMBusWrapper
 from smbus import SMBus
 import time
 import RPi.GPIO as GPIO
@@ -8,8 +7,6 @@ from picamera import PiCamera
 from picamera.array import PiRGBArray
 import argparse
 import cv2
-
-#camera = PiCamera()
 
 Trash_Data = [0,255,255,255,255,255,255,255,255,255,255,255]
 ProT = [None]*18
@@ -56,9 +53,11 @@ Mapping_Dic = { 0:[0,17]}
 #ProT_arrange = [i for i in range(0,12)]
 ProT_arrange = [0]
 
-#Write a number over the I2C bus.
-#Used to get a reading from the tag reader into the
-#ProTrinket buffer.
+"""
+Write a number over the I2C bus.
+Used to get a reading from the tag reader into the
+ProTrinket buffer.
+"""
 def writeNumber (value,address_1):
     try:
         #with SMBus(1) as bus:
@@ -68,8 +67,10 @@ def writeNumber (value,address_1):
         print (e)
     return -1
 
-# Gets the last full tag in the ProTrinket serial buffer.
-# Converts this into a readable string.
+"""
+Gets the last full tag in the ProTrinket serial buffer.
+Converts this into a readable string.
+"""
 def readNumber(address_1):
     number1 = []
     try:
@@ -88,6 +89,10 @@ def readNumber(address_1):
         print (e)
     return number1,time.time()
 
+"""
+Scans all readers based on their position in the map.
+If any mice detected, save their tag and position with the frame number.
+"""
 def scan(f = False, frame = 0):
     mice = []
     for i in ProT_arrange:
@@ -96,7 +101,7 @@ def scan(f = False, frame = 0):
 
         for x in Mapping_Dic[i]:
             writeNumber(int(1), ProT[x])
-        time.sleep (0.035)
+        time.sleep (0.02)
         for x in Mapping_Dic[i]:
             [Data,Time] = readNumber (ProT[x])
             Time = time.time()
@@ -132,6 +137,7 @@ def readTag(tagID):
 
 def record():
     with open ("RTS_test.txt" , "w") as f:
+        #Set up the camera for constant exposure
         camera = PiCamera()
         camera.resolution = (640, 480)
         camera.framerate = 30

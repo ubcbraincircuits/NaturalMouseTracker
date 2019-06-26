@@ -1,5 +1,6 @@
 """
 Final processing file. Copy into the darknet folder to run.
+Adapted from https://github.com/AlexeyAB/darknet
 """
 
 from ctypes import *
@@ -134,12 +135,14 @@ def YOLO(trialName, mice, RFID):
                 error = True
             continue
         if len(detections) > len(mice):
+            #Sort by the likelihood that it is a mouse, remove the least likely ones
             sortedDetections = sorted(detections, key=lambda l: l[1])
             while len(sortedDetections) >len(mice):
                 sortedDetections.remove(sortedDetections[0])
             detections = sortedDetections
         cleanedDetections = []
         for detection in detections:
+            #Update trackers by Euclidean distance
             x = detection[2][0]
             y = detection[2][1]
             nearestTracker = sorted(list(filter(lambda x: x.tag() not in updatedTags, mice)), key= lambda l: l.distanceFromPos((x,y)))[0]
@@ -151,6 +154,7 @@ def YOLO(trialName, mice, RFID):
         image = cvDrawBoxes(cleanedDetections, frame_resized)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         if len(detections) < len(mice) and error is False:
+            #Mice have been lost this frame!
             error = True
             for tracker in filter(lambda x: x.tag() not in updatedTags, mice):
                 if tracker.tag() > 9999:
@@ -159,13 +163,18 @@ def YOLO(trialName, mice, RFID):
                     mice.remove(tracker)
                     mice.append(MouseTracker(tracker.getPosition(), dummyTag, frameName))
                     dummyTag += 1
+                else:
+                    #This is a dummy tracker
+                    mice.remove(tracker)
         elif error == True:
+            #Check if we can match up a dummy mouse with a tag
             anonymousTrackers = list(filter(lambda x: x.tag() < 9999, mice))
             for line in RFID:
                 ln = line.split(';')
                 if "frameData/" + ln[2].strip('\n') == frameName:
                     for tracker in lostTrackers:
                         if int(ln[0]) == tracker.tag():
+                            #Match!
                             position = list(int(item) for item in ln[1].strip('()\n').split(','))
                             nearestAnon = sorted(anonymousTrackers, key= lambda x: x.distanceFromPos(position))[0]
                             tracker.recordedPositions.extend(nearestAnon.recordedPositions)
@@ -174,6 +183,7 @@ def YOLO(trialName, mice, RFID):
                             mice.append(tracker)
                     break
             if len(lostTrackers) == 1:
+                #Only one lost mouse = only one possibility
                 missingMouse = list(filter(lambda x: x.tag() < 9999, mice))[0]
                 lostTrackers[0].recordedPositions.extend(missingMouse.recordedPositions)
                 mice.append(lostTrackers[0])
@@ -198,12 +208,6 @@ if __name__ == "__main__":
     for tag in tags:
         mouseTrackers.append(MouseTracker([0,0], tag))
     RFIDResponses = []
-    # fileName = "startup.txt"
-    # file = open(fileName, "r")
-    # mouseLines = file.readlines()
-    # for line in mouseLines:
-    #     ln = line.split(';')
-    #     mouseTrackers.append(MouseTracker((item for item in ln[1].strip('()\n').split(',')), int(ln[0])))
     dataFileName = "RTS_test.txt"
     file = open(dataFileName, "r")
     RFIDResponses = file.readlines()
