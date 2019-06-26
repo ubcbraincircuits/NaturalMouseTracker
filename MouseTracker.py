@@ -5,17 +5,20 @@ Tracking file. Copy into the darknet folder for processing.
 import numpy as np
 class MouseTracker:
 
-    def __init__(self, startCoord, id):
+    def __init__(self, startCoord, id, frame = ''):
         self.currCoord = startCoord
-        if startCoord is not (0,0):
+        if startCoord != [0,0]:
+            startCoord.append(frame)
             self.recordedPositions = [startCoord]
+        else:
+            self.recordedPositions = []
         self.id = id
         self.bundled = False
 
-    def updatePosition(self, coordinate, isBundle=False):
+    def updatePosition(self, coordinate, frame=''):
         self.currCoord = coordinate
+        coordinate.append(frame)
         self.recordedPositions.append(coordinate)
-        self.bundled = isBundle
 
     def getPosition(self):
         return self.currCoord

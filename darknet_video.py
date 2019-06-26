@@ -129,7 +129,7 @@ def YOLO(trialName, mice, RFID):
                 lostTrackers.append(mouse)
             mice = []
             for detection in detections:
-                mice.append(MouseTracker((detection[2][0], detection[2][1]), dummyTag))
+                mice.append(MouseTracker([detection[2][0], detection[2][1]], dummyTag, frameName))
                 dummyTag += 1
                 error = True
             continue
@@ -144,7 +144,7 @@ def YOLO(trialName, mice, RFID):
             y = detection[2][1]
             nearestTracker = sorted(list(filter(lambda x: x.tag() not in updatedTags, mice)), key= lambda l: l.distanceFromPos((x,y)))[0]
             updatedTags.append(nearestTracker.tag())
-            nearestTracker.updatePosition((x, y))
+            nearestTracker.updatePosition([x, y], frameName)
             detection = list(detection)
             detection[0] = nearestTracker.tag()
             cleanedDetections.append(detection)
@@ -157,7 +157,7 @@ def YOLO(trialName, mice, RFID):
                     #This is not a dummy tracker
                     lostTrackers.append(tracker)
                     mice.remove(tracker)
-                    mice.append(MouseTracker(tracker.getPosition(), dummyTag))
+                    mice.append(MouseTracker(tracker.getPosition(), dummyTag, frameName))
                     dummyTag += 1
         elif error == True:
             anonymousTrackers = list(filter(lambda x: x.tag() < 9999, mice))
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     tags = tuple(int(x.strip()) for x in input("Please input the mouse tags, separated by commas").split(','))
     print(tags)
     for tag in tags:
-        mouseTrackers.append(MouseTracker((0,0), tag))
+        mouseTrackers.append(MouseTracker([0,0], tag))
     RFIDResponses = []
     # fileName = "startup.txt"
     # file = open(fileName, "r")
