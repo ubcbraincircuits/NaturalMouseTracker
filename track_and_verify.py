@@ -61,7 +61,7 @@ def setup():
         camera.capture("startup.png")
         mice = RFID_Reader.scan()
         print("mice", mice)
-        
+
         for (tag, Position) in mice:
             Position = Position
             mouseList = list(filter(lambda x: x.tag() == tag, mouseTrackers))

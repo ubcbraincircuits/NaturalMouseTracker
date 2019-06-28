@@ -166,6 +166,8 @@ def YOLO(trialName, mice, RFID):
                 else:
                     #This is a dummy tracker
                     mice.remove(tracker)
+                    mice.append(MouseTracker(tracker.getPosition(), dummyTag, frameName))
+                    dummyTag += 1
         elif error == True:
             #Check if we can match up a dummy mouse with a tag
             anonymousTrackers = list(filter(lambda x: x.tag() < 9999, mice))
