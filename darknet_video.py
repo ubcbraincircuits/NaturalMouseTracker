@@ -226,8 +226,8 @@ def YOLO(trialName, mice, RFID):
                             print(position)
                             position[0] *= 416/640
                             position[1] *= 416/480
-                            nearestAnons = sorted(anonymousTrackers, key= lambda x: x.distanceFromPos(position))[0]
-                            if nearestAnons[0].distanceFromPos((nearestAnons[1].getPosition()[0], nearestAnons[1].getPosition()[1])) < maxSwapDistance:
+                            nearestAnons = sorted(anonymousTrackers, key= lambda x: x.distanceFromPos(position))
+                            if abs(nearestAnons[0].distanceFromPos(position) - nearestAnons[1].distanceFromPos(position)) < maxSwapDistance:
                                 #We cannot be certain which one is over the reader
                                 break
                             nearestAnon = nearestAnons[0]
@@ -252,7 +252,7 @@ def YOLO(trialName, mice, RFID):
             if len(lostTrackers) == 0:
                 error = False
         cv2.imshow('Demo', image)
-        input("next")
+        # input("next")
         cv2.waitKey(3)
     out.release()
     mouseDict = {}
