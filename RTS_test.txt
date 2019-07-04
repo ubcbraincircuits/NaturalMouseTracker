@@ -1,3 +1,2 @@
-1;(103, 170);tracking_systembase_tracking70.png
-1;(530, 310);tracking_systembase_tracking123.png
-1;(103, 170);tracking_systembase_tracking182.png
+1;(530, 310);tracking_systembase_tracking1.jpg
+1;(530, 310);tracking_systembase_tracking171.jpg

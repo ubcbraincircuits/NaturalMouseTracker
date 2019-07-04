@@ -10,6 +10,7 @@ import imutils
 from imutils.video import FPS
 import argparse
 from RFIDTagReader import TagReader
+import threading
 import cv2
 
 Trash_Data = [0,255,255,255,255,255,255,255,255,255,255,255]
@@ -20,7 +21,7 @@ ProT = [None]*18
 ##    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
 ##    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
 ##]
-readerMap = [(103,170), (530, 310)]
+readerMap = [(530, 310), (103,170)]
 #Hex I2C Addresses of all ProTrinkets
 ProT [0] = 0x11
 ProT [1] = 0x12
@@ -98,34 +99,18 @@ def readNumber(address_1):
 Scans all readers based on their position in the map.
 If any mice detected, save their tag and position with the frame number.
 """
-def scan(f = False, frame = 0, readers = []):
-    mice = []
-    for i in ProT_arrange:
-        Data = Trash_Data
-        i = 0
-        for reader in readers:
-            Data = reader.readTag()
-            if f is not False and Data > 0:
-                f.write (str(Data)+";"+str(readerMap[i])+";"+str(frame)+"\n")
-            i += 1
-##        for x in Mapping_Dic[i]:
-##            [Data,Time] = readNumber (ProT[x])
-##            Time = time.time()
-##            #Data = number1
-##            if '\r' not in Data:
-##                Data = []
-##            if (Data != Trash_Data and Data != []):
-##                try:
-##                    number =  ''.join(Data)
-##                    #The tag is always 10 characters long
-##                    number = number[0:10]
-##                    mice.append((int(number, 16), x))
-##                    if f is not False:
-##                        f.write (str(int(number, 16))+";"+str(readerMap[x])+";"+str(frame)+"\n")
-##                except Exception as e:
-##                    print(str(e))
-    return mice
+frameCount = 0
 
+def scan(reader, f, readerNum):
+    global frameCount
+    mice = []
+    try:
+        Data = reader.readTag()
+        if f is not False and Data > 0:
+            frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
+            f.write (str(Data)+";"+str(readerMap[readerNum])+";"+frameName+"\n")
+    finally:
+        return
 
 def readTag(tagID):
     writeNumber(int(1), ProT[tagID])
@@ -142,6 +127,7 @@ def readTag(tagID):
         return False
 
 def record():
+    global frameCount
     RFID_serialPort = '/dev/ttyUSB0'
     #RFID_serialPort = '/dev/serial0'
     #RFID_serialPort='/dev/cu.usbserial-AL00ES9A'
@@ -150,36 +136,44 @@ def record():
     Setting to timeout to None means we don't return till we have a tag.
     If a timeout is set and no tag is found, 0 is returned.
     """
-    RFID_timeout = 0.005
+    RFID_timeout = 0.015
     RFID_doCheckSum = True
-    reader1 = TagReader (RFID_serialPort, RFID_doCheckSum, timeOutSecs = RFID_timeout, kind=RFID_kind)
-    reader2 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = RFID_timeout, kind=RFID_kind)
+    reader1 = TagReader (RFID_serialPort, RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader2 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     with open ("RTS_test.txt" , "w") as f:
 
         time.sleep(0.25)
         firstFrame = cv2.imread("ref.jpg")
         firstFrame = cv2.cvtColor(firstFrame, cv2.COLOR_BGR2GRAY)
-        frameCount = 0
         needPulse = False
         vs = PiVideoStream(resolution=(640,480)).start()
         vs.camera.exposure_mode = "off"
         time.sleep(2)
         fps = FPS().start()
         startTime = time.time()
+        thread0 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 0))
+        thread1 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 1))
+        thread0.start()
+        thread1.start()
         while True:
             try:
                 frame = vs.read()
-                frameName = 'tracking_system' + trialName + str(frameCount) + '.png'
+                frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
                 frameCount += 1
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                cv2.imshow("Mouse Tracking", frame)
-                key = cv2.waitKey(1)& 0xFF
+                #cv2.imshow("Mouse Tracking", frame)
+                #key = cv2.waitKey(1)& 0xFF
                 cv2.imwrite("frameData/" + frameName, gray)
-                mice = scan(f, frameName, (reader1, reader2))
+                if not thread0.is_alive():
+                    thread0 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 0))
+                    thread0.start()
+                if not thread1.is_alive():    
+                    thread1 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 1))
+                    thread1.start()
                 fps.update()
             except KeyboardInterrupt:
                break
-        fps.stop()        
+        fps.stop()
         print("[INFO] elapsed time: {:.2f}".format(fps.elapsed()))
         print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
         cv2.destroyAllWindows()
@@ -189,10 +183,11 @@ if __name__=="__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("-t", "--text", help="path to the text file")
     ap.add_argument("-n", "--name", default ="base_tracking", help="trial name")
+    ap.add_argument("-c", "--count", default =0, help="initial count")
     args = vars(ap.parse_args())
-
     if args.get("text", None) is not None:
         fileName = args.get('text')
         open(fileName, "w+").close()
     trialName = args.get("name")
+    frameCount = args.get("count")
     record()
