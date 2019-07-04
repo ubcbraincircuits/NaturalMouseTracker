@@ -3,22 +3,30 @@ Tracking file. Copy into the darknet folder for processing.
 """
 
 import numpy as np
+from collections import deque
 class MouseTracker:
 
     def __init__(self, startCoord, id, frame = ''):
         self.currCoord = startCoord
+        self.positionQueue = deque(maxlen=5)
         if startCoord != [0,0]:
             startCoord.append(frame)
+            self.positionQueue.append(startCoord)
             self.recordedPositions = [startCoord]
         else:
             self.recordedPositions = []
         self.id = id
         self.bundled = False
+        self.lastFrameCount = 0
+        self.velocity = (0,0)
 
-    def updatePosition(self, coordinate, frame=''):
+    def updatePosition(self, coordinate, frame='', frameCount = 0):
         self.currCoord = coordinate
         coordinate.append(frame)
+        self.lastFrameCount = frameCount
         self.recordedPositions.append(coordinate)
+        self.positionQueue.append(coordinate)
+        self.velocity = ((coordinate[0] - self.positionQueue[0][0]), (coordinate[1] - self.positionQueue[0][1]))
 
     def getPosition(self):
         return self.currCoord
