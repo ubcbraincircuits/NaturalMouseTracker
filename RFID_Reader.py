@@ -5,18 +5,22 @@ import decimal
 from random import shuffle
 from picamera import PiCamera
 from picamera.array import PiRGBArray
+from imutils.video.pivideostream import PiVideoStream
+import imutils
+from imutils.video import FPS
 import argparse
+from RFIDTagReader import TagReader
 import cv2
 
 Trash_Data = [0,255,255,255,255,255,255,255,255,255,255,255]
 ProT = [None]*18
 
-readerMap = [
-    (103, 170), (177, 160), (274, 145), (390, 140), (475, 138), (542, 145), #1-(1-6) [y-x]
-    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
-    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
-]
-
+##readerMap = [
+##    (103, 170), (177, 160), (274, 145), (390, 140), (475, 138), (542, 145), #1-(1-6) [y-x]
+##    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
+##    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
+##]
+readerMap = [(103,170), (530, 310)]
 #Hex I2C Addresses of all ProTrinkets
 ProT [0] = 0x11
 ProT [1] = 0x12
@@ -52,6 +56,7 @@ Mapping_Dic = { 0:[0,17]}
 #ProT_arrange = [i for i in range(0,8)]
 #ProT_arrange = [i for i in range(0,12)]
 ProT_arrange = [0]
+
 
 """
 Write a number over the I2C bus.
@@ -93,31 +98,32 @@ def readNumber(address_1):
 Scans all readers based on their position in the map.
 If any mice detected, save their tag and position with the frame number.
 """
-def scan(f = False, frame = 0):
+def scan(f = False, frame = 0, readers = []):
     mice = []
     for i in ProT_arrange:
         Data = Trash_Data
-        #time.sleep(0.01)
-
-        for x in Mapping_Dic[i]:
-            writeNumber(int(1), ProT[x])
-        time.sleep (0.02)
-        for x in Mapping_Dic[i]:
-            [Data,Time] = readNumber (ProT[x])
-            Time = time.time()
-            #Data = number1
-            if '\r' not in Data:
-                Data = []
-            if (Data != Trash_Data and Data != []):
-                try:
-                    number =  ''.join(Data)
-                    #The tag is always 10 characters long
-                    number = number[0:10]
-                    mice.append((int(number, 16), x))
-                    if f is not False:
-                        f.write (str(int(number, 16))+";"+str(readerMap[x])+";"+str(frame)+"\n")
-                except Exception as e:
-                    print(str(e))
+        i = 0
+        for reader in readers:
+            Data = reader.readTag()
+            if f is not False and Data > 0:
+                f.write (str(Data)+";"+str(readerMap[i])+";"+str(frame)+"\n")
+            i += 1
+##        for x in Mapping_Dic[i]:
+##            [Data,Time] = readNumber (ProT[x])
+##            Time = time.time()
+##            #Data = number1
+##            if '\r' not in Data:
+##                Data = []
+##            if (Data != Trash_Data and Data != []):
+##                try:
+##                    number =  ''.join(Data)
+##                    #The tag is always 10 characters long
+##                    number = number[0:10]
+##                    mice.append((int(number, 16), x))
+##                    if f is not False:
+##                        f.write (str(int(number, 16))+";"+str(readerMap[x])+";"+str(frame)+"\n")
+##                except Exception as e:
+##                    print(str(e))
     return mice
 
 
@@ -136,37 +142,49 @@ def readTag(tagID):
         return False
 
 def record():
+    RFID_serialPort = '/dev/ttyUSB0'
+    #RFID_serialPort = '/dev/serial0'
+    #RFID_serialPort='/dev/cu.usbserial-AL00ES9A'
+    RFID_kind = 'ID'
+    """
+    Setting to timeout to None means we don't return till we have a tag.
+    If a timeout is set and no tag is found, 0 is returned.
+    """
+    RFID_timeout = 0.005
+    RFID_doCheckSum = True
+    reader1 = TagReader (RFID_serialPort, RFID_doCheckSum, timeOutSecs = RFID_timeout, kind=RFID_kind)
+    reader2 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = RFID_timeout, kind=RFID_kind)
     with open ("RTS_test.txt" , "w") as f:
-        #Set up the camera for constant exposure
-        camera = PiCamera()
-        camera.resolution = (640, 480)
-        camera.framerate = 30
-        camera.iso =600
-        camera.exposure_mode="off"
-        rawCapture = PiRGBArray(camera, size=(640, 480))
 
         time.sleep(0.25)
         firstFrame = cv2.imread("ref.jpg")
         firstFrame = cv2.cvtColor(firstFrame, cv2.COLOR_BGR2GRAY)
-        #firstFrame = cv2.GaussianBlur(firstFrame, (21,21), 0)
-        startUpIterations = 100
-        diffFrameCount = 0
         frameCount = 0
         needPulse = False
-        for rawFrame in camera.capture_continuous(rawCapture, format = "bgr", use_video_port=True):
+        vs = PiVideoStream(resolution=(640,480)).start()
+        vs.camera.exposure_mode = "off"
+        time.sleep(2)
+        fps = FPS().start()
+        startTime = time.time()
+        while True:
             try:
-                frameName = "tracking_system" + trialName + str(frameCount) + ".png"
+                frame = vs.read()
+                frameName = 'tracking_system' + trialName + str(frameCount) + '.png'
                 frameCount += 1
-                frame = rawFrame.array
-                rawFrame.truncate(0)
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                cv2.imshow("Mouse Tracking", gray)
+                cv2.imshow("Mouse Tracking", frame)
                 key = cv2.waitKey(1)& 0xFF
                 cv2.imwrite("frameData/" + frameName, gray)
-                mice = scan(f, frameName)
+                mice = scan(f, frameName, (reader1, reader2))
+                fps.update()
             except KeyboardInterrupt:
-                break
-
+               break
+        fps.stop()        
+        print("[INFO] elapsed time: {:.2f}".format(fps.elapsed()))
+        print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
+        cv2.destroyAllWindows()
+        vs.stop()
+        
 if __name__=="__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("-t", "--text", help="path to the text file")
