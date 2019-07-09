@@ -21,7 +21,7 @@ ProT = [None]*18
 ##    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
 ##    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
 ##]
-readerMap = [(530, 310), (103,170)]
+readerMap = [(103,140), (540, 320)]
 #Hex I2C Addresses of all ProTrinkets
 ProT [0] = 0x11
 ProT [1] = 0x12
@@ -159,6 +159,9 @@ def record():
                 frame, frameCount = vs.read()
                 #cv2.imshow("Mouse Tracking", frame)
                 #key = cv2.waitKey(1)& 0xFF
+                #gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                #frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
+                #cv2.imwrite("frameData/" + frameName, gray)
                 if not thread0.is_alive():
                     thread0 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 0))
                     thread0.start()

@@ -10,14 +10,12 @@ from queue import Queue
 import cv2
 
 class PiVideoStream:
-	def __init__(self, resolution=(320, 240), framerate=80, trialName= "base"):
+	def __init__(self, resolution=(640, 480), framerate=32, trialName= "base"):
 		# initialize the camera and stream
 		self.camera = PiCamera()
 		self.trialName = trialName
 		self.camera.resolution = resolution
 		self.camera.framerate = framerate
-		self.camera.exposure_mode="off"
-		self.camera.saturation = -100
 		self.rawCapture = PiRGBArray(self.camera, size=resolution)
 		self.stream = self.camera.capture_continuous(self.rawCapture,
 			format="bgr", use_video_port=True)
@@ -43,7 +41,7 @@ class PiVideoStream:
 		while True:
                         frame, frameCount = self.frames.get()
                         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                        frameName = 'tracking_system' + self.trialName + str(frameCount) + '.jpg'
+                        frameName = 'tracking_system' + self.trialName + str(frameCount) + '.png'
                         cv2.imwrite("frameData/" + frameName, gray)
                         self.frames.task_done()
                         
