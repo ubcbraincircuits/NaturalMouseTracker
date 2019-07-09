@@ -5,7 +5,7 @@ import decimal
 from random import shuffle
 from picamera import PiCamera
 from picamera.array import PiRGBArray
-from imutils.video.pivideostream import PiVideoStream
+from PiVideoStream import PiVideoStream
 import imutils
 from imutils.video import FPS
 import argparse
@@ -146,10 +146,9 @@ def record():
         firstFrame = cv2.imread("ref.jpg")
         firstFrame = cv2.cvtColor(firstFrame, cv2.COLOR_BGR2GRAY)
         needPulse = False
-        vs = PiVideoStream(resolution=(640,480)).start()
+        vs = PiVideoStream(resolution=(640,480), trialName=trialName).start()
         vs.camera.exposure_mode = "off"
         time.sleep(2)
-        fps = FPS().start()
         startTime = time.time()
         thread0 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 0))
         thread1 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 1))
@@ -157,25 +156,17 @@ def record():
         thread1.start()
         while True:
             try:
-                frame = vs.read()
-                frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
-                frameCount += 1
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                frame, frameCount = vs.read()
                 #cv2.imshow("Mouse Tracking", frame)
                 #key = cv2.waitKey(1)& 0xFF
-                cv2.imwrite("frameData/" + frameName, gray)
                 if not thread0.is_alive():
                     thread0 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 0))
                     thread0.start()
                 if not thread1.is_alive():    
                     thread1 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 1))
                     thread1.start()
-                fps.update()
             except KeyboardInterrupt:
                break
-        fps.stop()
-        print("[INFO] elapsed time: {:.2f}".format(fps.elapsed()))
-        print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
         cv2.destroyAllWindows()
         vs.stop()
         

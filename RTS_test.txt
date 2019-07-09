@@ -1,2 +1,0 @@
-1;(530, 310);tracking_systembase_tracking1.jpg
-1;(530, 310);tracking_systembase_tracking171.jpg
