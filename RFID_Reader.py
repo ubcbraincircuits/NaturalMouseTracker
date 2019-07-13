@@ -107,7 +107,7 @@ def scan(reader, f, readerNum):
     try:
         Data = reader.readTag()
         if f is not False and Data > 0:
-            frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
+            frameName = 'tracking_system' + trialName + str(frameCount) + '.png'
             f.write (str(Data)+";"+str(readerMap[readerNum])+";"+frameName+"\n")
     finally:
         return
@@ -165,14 +165,14 @@ def record():
                 if not thread0.is_alive():
                     thread0 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 0))
                     thread0.start()
-                if not thread1.is_alive():    
+                if not thread1.is_alive():
                     thread1 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 1))
                     thread1.start()
             except KeyboardInterrupt:
                break
         cv2.destroyAllWindows()
         vs.stop()
-        
+
 if __name__=="__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("-t", "--text", help="path to the text file")

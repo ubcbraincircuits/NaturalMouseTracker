@@ -15,6 +15,7 @@ import json
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import itertools
+from shutil import copyfile
 from MouseTracker import MouseTracker
 
 def convertBack(x, y, w, h):
@@ -40,7 +41,8 @@ def cvDrawBoxes(detections, img):
         cv2.rectangle(img, pt1, pt2, (0, 255, 0), 1)
         cv2.circle(img, (int(x),int(y)), 5, [0,0,255])
         cv2.circle(img, (int(525*416/640),int(310*416/480)), 5, [0,255,0])
-        cv2.circle(img, (int(103*416/640),int(170*416/480)), 5, [0,255,0])
+        cv2.circle(img, (int(103*416/640),int(120*416/480)), 5, [0,255,0])
+        cv2.circle(img, (int(x),int(y)), maxSwapDistance, [255,0,0])
         cv2.arrowedLine(img, (int(x - vx/2),int(y - vy/2)), (int(x + vx/2),int(y + vy/2)), [0,0,255])
         cv2.putText(img,
                     str(detection[0]) +
@@ -53,14 +55,15 @@ def cvDrawBoxes(detections, img):
 netMain = None
 metaMain = None
 altNames = None
-maxSwapDistance = 50
+maxSwapDistance = 35
+minSwapVelocity = 7
 
 def YOLO(trialName, mice, RFID):
     miceNum = len(mice)
 
     global metaMain, netMain, altNames
     configPath = "./yolo-obj.cfg"
-    weightPath = "./yolo-obj_last.weights"
+    weightPath = "./yolo-obj_best.weights"
     metaPath = "./data/obj.data"
     if not os.path.exists(configPath):
         raise ValueError("Invalid config path `" +
@@ -108,7 +111,7 @@ def YOLO(trialName, mice, RFID):
     # Create an image we reuse for each detect
     darknet_image = darknet.make_image(darknet.network_width(netMain),
                                     darknet.network_height(netMain),3)
-    frameCount = 0
+    frameCount = 1
     """
     Problem: Mice disappear and then reappear while others are unidentified. They should be instantly identified but are not.
     Essentially, need secondary handling before moving into "officially lost"
@@ -121,7 +124,10 @@ def YOLO(trialName, mice, RFID):
     partialLostTrackers = []
     error = False
     dummyTag = 0
+    badFrameCount = 0
     while True:
+        if frameCount > 5000:
+            break
         try:
             prev_time = time.time()
             frameName = "frameData/tracking_system" + trialName + str(frameCount) + ".png"
@@ -142,7 +148,7 @@ def YOLO(trialName, mice, RFID):
 
         # print(1/(time.time()-prev_time))
         updatedTags = []
-        if frameCount == 1:
+        if frameCount == 2 or (len(mice) == 0 and len(detections) == miceNum):
             for mouse in mouseTrackers:
                 lostTrackers.append(mouse)
             mice = []
@@ -151,13 +157,25 @@ def YOLO(trialName, mice, RFID):
                 dummyTag += 1
                 error = True
             continue
+        elif len(mice) == 0:
+            #Problem starting up
+            continue
         if len(detections) > miceNum:
             #Sort by the likelihood that it is a mouse, remove the least likely ones
             sortedDetections = sorted(detections, key=lambda l: l[1])
-            while len(sortedDetections) >len(mice):
+            while len(sortedDetections) > miceNum:
                 sortedDetections.remove(sortedDetections[0])
             detections = sortedDetections
         cleanedDetections = []
+        if len(detections) < miceNum:
+            #Temp
+            copyfile(frameName, "Errors/tracking_system" + trialName + str(frameCount) + ".png")
+            if badFrameCount < 1:
+                print("bad frame")
+                badFrameCount += 1
+                continue
+        if len(detections) == miceNum:
+            badFrameCount = 0
         #Adjustment: First assign the recently known mice, then the recently lost.
         """
         Approach 1: Assign each detection to its nearest mouse.
@@ -190,13 +208,28 @@ def YOLO(trialName, mice, RFID):
                     partialLostTrackers = []
         image = cvDrawBoxes(cleanedDetections, frame_resized)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        cv2.imshow('Demo', image)
+        cv2.waitKey(3)
         if len(cleanedDetections) < miceNum:
             #Mice have been lost this frame!
             error = True
             for tracker in filter(lambda x: x.tag() not in updatedTags and x not in partialLostTrackers, mice):
                 partialLostTrackers.append(tracker)
-                nearest = sorted(list(filter(lambda x: x.tag() in updatedTags, mice)), key= lambda l: l.distanceFromPos(tracker.getPosition()))[0]
+                nearest = sorted(list(filter(lambda x: x.tag() in updatedTags, mice)), key= lambda l: l.distanceFromPos(tracker.getPosition()))
+                if len(nearest) > 0:
+                    nearest = nearest[0]
+                else:
+                    break
                 if nearest.distanceFromPos(tracker.getPosition()) < maxSwapDistance and nearest not in partialLostTrackers:
+                    #This checks if there is a mouse nearby to the one that just disappeared.
+                    #We also check if this mouse has an abrupt change in velocity
+                    #This indicates that we may get identity swaps.
+                    print(nearest.velocity)
+                    print(tracker.tag(), tracker.getPosition())
+                    print(nearest.tag(), nearest.getPosition())
+                    if (nearest.velocity[0]**2 + nearest.velocity[1]**2) < minSwapVelocity**2:
+                        print("no swap")
+                        continue
                     partialLostTrackers.append(nearest)
         if len(partialLostTrackers) > 1:
             #Lost more than one? Then once it reappears we cannot know which it is.
@@ -208,7 +241,7 @@ def YOLO(trialName, mice, RFID):
                     #This is not a dummy tracker, we can find it again
                     lostTrackers.append(track)
                 mice.remove(track)
-                mice.append(MouseTracker(nearest.getPosition(), dummyTag, frameName))
+                mice.append(MouseTracker(track.getPosition(), dummyTag, frameName))
                 dummyTag += 1
             partialLostTrackers = []
 
@@ -227,7 +260,7 @@ def YOLO(trialName, mice, RFID):
                             position[0] *= 416/640
                             position[1] *= 416/480
                             nearestAnons = sorted(anonymousTrackers, key= lambda x: x.distanceFromPos(position))
-                            if abs(nearestAnons[0].distanceFromPos(position) - nearestAnons[1].distanceFromPos(position)) < maxSwapDistance:
+                            if abs(nearestAnons[0].distanceFromPos(position) - nearestAnons[1].distanceFromPos(position)) < 30:
                                 #We cannot be certain which one is over the reader
                                 break
                             nearestAnon = nearestAnons[0]
@@ -238,6 +271,23 @@ def YOLO(trialName, mice, RFID):
                             mice.remove(nearestAnon)
                             mice.append(tracker)
                     break
+            av_x = 0.0
+            av_y = 0.0
+            for mouse in filter(lambda x: x.tag() < 99999, mice):
+                 av_x += mouse.getPosition()[0]
+                 av_y += mouse.getPosition()[1]
+            av_x /= len(lostTrackers)
+            av_y /= len(lostTrackers)
+            allMiceClose = True
+            for mouse in filter(lambda x: x.tag() < 99999, mice):
+                if mouse.distanceFromPos((av_x, av_y)) > 100:
+                    #Cannot approximate position as the average
+                    allMiceClose = False
+            if allMiceClose:
+                for lostMouse in lostTrackers:
+                    #In order to not lose all data, save approximate location
+                    #if mice are close enough together. (e.g. sleeping in corner)
+                    lostMouse.updatePosition([av_x, av_y], frameName)
             if len(lostTrackers) == 1:
                 print("one")
                 #Only one lost mouse = only one possibility
@@ -251,13 +301,13 @@ def YOLO(trialName, mice, RFID):
                 print(list(map(lambda mouse: (mouse.tag(), mouse.getPosition()), mice)))
             if len(lostTrackers) == 0:
                 error = False
-        cv2.imshow('Demo', image)
-        # input("next")
-        cv2.waitKey(3)
+
+        #input("next")
     out.release()
     mouseDict = {}
     for mouse in mouseTrackers:
         mouseDict.update({mouse.tag(): mouse.recordedPositions})
+        print(mouse.tag(), str(len(mouse.recordedPositions)/4829*100) + "% Covered")
     with open("processed.json", "w") as outfile:
         json.dump(mouseDict, outfile, ensure_ascii=False)
 
@@ -271,4 +321,4 @@ if __name__ == "__main__":
     dataFileName = "RTS_test.txt"
     file = open(dataFileName, "r")
     RFIDResponses = file.readlines()
-    YOLO("base_tracking", mouseTrackers, RFIDResponses)
+    YOLO("verify", mouseTrackers, RFIDResponses)
