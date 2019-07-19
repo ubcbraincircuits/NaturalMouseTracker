@@ -6,11 +6,12 @@ import numpy as np
 from collections import deque
 class MouseTracker:
 
-    def __init__(self, startCoord, id, frame = ''):
+    def __init__(self, startCoord, id, frame = '', frameCount = 0, width = 0, height = 0):
         self.currCoord = startCoord
         self.positionQueue = deque(maxlen=2)
         if startCoord != [0,0]:
             startCoord.append(frame)
+            startCoord.append(frameCount)
             self.positionQueue.append(startCoord)
             self.recordedPositions = [startCoord]
         else:
@@ -21,30 +22,43 @@ class MouseTracker:
         self.lastFrameCount = 0
         self.velocity = (0,0)
 
-    def updatePosition(self, coordinate, frame='', frameCount = 0):
+    def updatePosition(self, coordinate, frame='', frameCount = 0, width = 0, height = 0):
         self.currCoord = coordinate
         coordinate.append(frame)
+        coordinate.append(frameCount)
+        coordinate.append(width)
+        coordinate.append(height)
         self.lastFrameCount = frameCount
         self.recordedPositions.append(coordinate)
         self.positionQueue.append(coordinate)
         self.velocity = ((coordinate[0] - self.positionQueue[0][0]), (coordinate[1] - self.positionQueue[0][1]))
 
     def validate(self):
-        self.validatedIndex = len(self.recordedPositions)
+        self.validatedIndex = len(self.recordedPositions) - 1
+
+    def lastValidatedPosition(self):
+        return self.recordedPositions[self.validatedIndex]
 
     def updatePositions(self, newPositions):
         for position in newPositions:
-            try:
-                index = next(i for i,v in enumerate(self.recordedPositions) if (lambda v: v[2] == position[2]))
-                self.recordedPositions.pop(index)
-            except StopIteration:
-                pass
-        self.validatedIndex = len(self.recordedPositions)
+            for rec in self.recordedPositions:
+                if rec[2] == position[2]:
+                    self.recordedPositions.remove(rec)
         self.recordedPositions.extend(newPositions)
+        self.recordedPositions = sorted(self.recordedPositions, key = lambda x: x[3])
+        self.validatedIndex = len(self.recordedPositions) - 1
+        self.currCoord = self.recordedPositions[self.validatedIndex]
 
-    def trimPositions(self):
-        tempPositions = self.recordedPositions[self.validatedIndex:]
-        self.recordedPositions = self.recordedPositions[:self.validatedIndex]
+    def trimPositions(self, frameCount = 0):
+        try:
+            index = next(i for i,v in enumerate(self.recordedPositions) if (lambda v: v[3] == frameCount))
+        except StopIteration:
+            index = 0
+        if index > self.validatedIndex:
+            self.validatedIndex = index
+        tempPositions = self.recordedPositions[self.validatedIndex + 1:]
+        self.recordedPositions = self.recordedPositions[:self.validatedIndex+1]
+        print(self.id, "Trimmed to", self.validatedIndex, self.lastValidatedPosition())
         return tempPositions
 
     def getPosition(self):
