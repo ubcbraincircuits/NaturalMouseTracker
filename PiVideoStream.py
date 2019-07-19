@@ -42,7 +42,8 @@ class PiVideoStream:
                         frame, frameCount = self.frames.get()
                         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                         frameName = 'tracking_system' + self.trialName + str(frameCount) + '.png'
-                        cv2.imwrite("frameData/" + frameName, gray)
+                        folderIndex = int(frameCount/20000)
+                        cv2.imwrite("frameData" + str(folderIndex)+" /" + frameName, gray)
                         self.frames.task_done()
                         
 	def update(self):
