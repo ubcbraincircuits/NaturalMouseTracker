@@ -8,13 +8,14 @@ class MouseTracker:
 
     def __init__(self, startCoord, id, frame = ''):
         self.currCoord = startCoord
-        self.positionQueue = deque(maxlen=5)
+        self.positionQueue = deque(maxlen=2)
         if startCoord != [0,0]:
             startCoord.append(frame)
             self.positionQueue.append(startCoord)
             self.recordedPositions = [startCoord]
         else:
             self.recordedPositions = []
+        self.validatedIndex = 0
         self.id = id
         self.bundled = False
         self.lastFrameCount = 0
@@ -27,6 +28,24 @@ class MouseTracker:
         self.recordedPositions.append(coordinate)
         self.positionQueue.append(coordinate)
         self.velocity = ((coordinate[0] - self.positionQueue[0][0]), (coordinate[1] - self.positionQueue[0][1]))
+
+    def validate(self):
+        self.validatedIndex = len(self.recordedPositions)
+
+    def updatePositions(self, newPositions):
+        for position in newPositions:
+            try:
+                index = next(i for i,v in enumerate(self.recordedPositions) if (lambda v: v[2] == position[2]))
+                self.recordedPositions.pop(index)
+            except StopIteration:
+                pass
+        self.validatedIndex = len(self.recordedPositions)
+        self.recordedPositions.extend(newPositions)
+
+    def trimPositions(self):
+        tempPositions = self.recordedPositions[self.validatedIndex:]
+        self.recordedPositions = self.recordedPositions[:self.validatedIndex]
+        return tempPositions
 
     def getPosition(self):
         return self.currCoord
