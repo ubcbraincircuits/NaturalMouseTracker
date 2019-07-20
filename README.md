@@ -7,7 +7,7 @@ reader, which then interface with the Raspberry Pi over I2C.
 The tag readers are set up in opposite corners of the cage, to minimize electromagnetic interference. This system is constantly running in parallel with the Overhead Camera, recording each tag read with respect to frames of the video.
 
 ## Overhead Camera
-Records data in discrete frames, converts to grayscale, and saves for use in the object detection system.
+Records data in discrete frames, converts to grayscale, and saves for use in the object detection system. Saving is done in parallel with recording so as to minimize lag spikes.
 
 ## YOLO
 An object detection system trained in-house using https://pjreddie.com/darknet/yolo/. Stands for "You Only Look Once" - this system is very fast and accurate, and only fails when mice climb completely atop one another, or are obscured from the camera's vision. The information from the object detection system feeds into the Mouse Trackers.
