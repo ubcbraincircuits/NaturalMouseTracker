@@ -28,6 +28,7 @@ def convertBack(x, y, w, h):
 
 
 def cvDrawBoxes(detections, img):
+    #temp
     for detection in detections:
         x, y, w, h = detection[2][0],\
             detection[2][1],\
@@ -39,6 +40,7 @@ def cvDrawBoxes(detections, img):
             float(x), float(y), float(w), float(h))
         pt1 = (xmin, ymin)
         pt2 = (xmax, ymax)
+        crop_img = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
         cv2.rectangle(img, pt1, pt2, (0, 255, 0), 1)
         cv2.circle(img, (int(x),int(y)), 5, [0,0,255])
         cv2.circle(img, (int(525*416/640),int(310*416/480)), 5, [0,255,0])
@@ -50,13 +52,15 @@ def cvDrawBoxes(detections, img):
                     " [" + str(round(detection[1] * 100, 2)) + "]",
                     (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     [0, 255, 0], 2)
+
+
     return img
 
 
 netMain = None
 metaMain = None
 altNames = None
-maxSwapDistance = 70
+maxSwapDistance = 65
 minSwapVelocity = 5
 
 def YOLO(trialName, mice, RFID):
@@ -229,8 +233,8 @@ def YOLO(trialName, mice, RFID):
                 cleanedDetections.append(updatedDetection)
                 if len(partialLostTrackers) == 1 and mouse.tag() == partialLostTrackers[0].tag():
                     partialLostTrackers = []
-        image = cvDrawBoxes(cleanedDetections, frame_resized)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
+        image = cvDrawBoxes(cleanedDetections, image)
         cv2.imshow('Demo', image)
         cv2.waitKey(3)
         if len(cleanedDetections) < miceNum:
