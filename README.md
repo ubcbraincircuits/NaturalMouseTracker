@@ -2,9 +2,8 @@
 A system for using RFID tags and computer vision to track multiple mouse movement within a small environment.
 
 ## RFID System
-Uses 2 ProTrinkets to interface with their own ID-20LA RFID tag
-reader, which then interface with the Raspberry Pi over I2C.
-The tag readers are set up in opposite corners of the cage, to minimize electromagnetic interference. This system is constantly running in parallel with the Overhead Camera, recording each tag read with respect to frames of the video.
+Uses 4 ID-20LA RFID tag readers, which then interface with the Raspberry Pi with serial communication.
+The tag readers are set up in the four corners of the cage, to minimize electromagnetic interference. This system is constantly running in parallel with the Overhead Camera, recording each tag read with respect to frames of the video.
 
 ## Overhead Camera
 Records data in discrete frames, converts to grayscale, and saves for use in the object detection system. Saving is done in parallel with recording so as to minimize lag spikes.
@@ -32,3 +31,4 @@ By combining these methods, we can confirm no identity swaps and an 80%+ coverag
 ### Sources
 - https://github.com/Ebonclaw/Mouse-Wearable-Tech---RFID-and-Localization-Grid-Computer-Vision-Enhancement - original inspiration
 - https://github.com/AlexeyAB/darknet - object detection 
+- https://github.com/jamieboyd/RFIDTagReader - tag reader
