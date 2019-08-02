@@ -27,8 +27,7 @@ def convertBack(x, y, w, h):
     return xmin, ymin, xmax, ymax
 
 
-def cvDrawBoxes(detections, img):
-    #temp
+def cvDrawBoxes(detections, img, mice_together):
     for detection in detections:
         x, y, w, h = detection[2][0],\
             detection[2][1],\
@@ -41,18 +40,19 @@ def cvDrawBoxes(detections, img):
         pt1 = (xmin, ymin)
         pt2 = (xmax, ymax)
         crop_img = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
+        # if not mice_together:
+            # cv2.imwrite("micePics/Individual" + str(time.time()) + ".png", crop_img)
         cv2.rectangle(img, pt1, pt2, (0, 255, 0), 1)
-        cv2.circle(img, (int(x),int(y)), 5, [0,0,255])
-        cv2.circle(img, (int(525*416/640),int(310*416/480)), 5, [0,255,0])
-        cv2.circle(img, (int(103*416/640),int(120*416/480)), 5, [0,255,0])
-        cv2.circle(img, (int(x),int(y)), maxSwapDistance, [255,0,0])
-        cv2.arrowedLine(img, (int(x - vx/2),int(y - vy/2)), (int(x + vx/2),int(y + vy/2)), [0,0,255])
+        cv2.circle(img, (int(x), int(y)), 5, [0, 0, 255])
+        cv2.circle(img, (int(525*608/640), int(310*608/480)), 5, [0, 255, 0])
+        cv2.circle(img, (int(103*608/640), int(120*608/480)), 5, [0, 255, 0])
+        cv2.circle(img, (int(x), int(y)), maxSwapDistance, [255, 0, 0])
+        cv2.arrowedLine(img, (int(x - vx/2), int(y - vy/2)), (int(x + vx/2), int(y + vy/2)), [0, 0, 255])
         cv2.putText(img,
                     str(detection[0]) +
                     " [" + str(round(detection[1] * 100, 2)) + "]",
                     (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     [0, 255, 0], 2)
-
 
     return img
 
@@ -60,8 +60,18 @@ def cvDrawBoxes(detections, img):
 netMain = None
 metaMain = None
 altNames = None
-maxSwapDistance = 65
+maxSwapDistance = 100
 minSwapVelocity = 5
+
+
+def miceWithinDistance(mice, distance):
+    within_dist = False
+    for mouse in mice:
+        for other in mice:
+            if other is not mouse and mouse.distanceFromPos(other.getPosition()) < distance:
+                within_dist = True
+    return within_dist
+
 
 def YOLO(trialName, mice, RFID):
     miceNum = len(mice)
@@ -104,10 +114,6 @@ def YOLO(trialName, mice, RFID):
                     pass
         except Exception:
             pass
-    #cap = cv2.VideoCapture(0)
-    # cap = cv2.VideoCapture("mice4.mp4")
-    # cap.set(3, 1280)
-    # cap.set(4, 720)
     print("Starting the YOLO loop...")
 
     # Create an image we reuse for each detect
@@ -132,9 +138,8 @@ def YOLO(trialName, mice, RFID):
     while True:
         try:
             validationFrame = False
-            prev_time = time.time()
-            frameName = "frameData/tracking_system" + trialName + str(frameCount) + ".png"
-            if "frameData/" + RFID[RFIDIndex + 1].split(';')[2].strip('\n') == frameName:
+            frameName = "frameData_shaved/tracking_system" + trialName + str(frameCount) + ".png"
+            if "frameData_shaved/" + RFID[RFIDIndex + 1].split(';')[2].strip('\n') == frameName:
                 validationFrame = True
                 RFIDIndex += 1
             frame_read = cv2.imread(frameName)
@@ -146,7 +151,7 @@ def YOLO(trialName, mice, RFID):
                                         darknet.network_height(netMain)),
                                        interpolation=cv2.INTER_LINEAR)
         except Exception as e:
-            #no more frames
+            # no more frames
             break
         darknet.copy_image_from_bytes(darknet_image,frame_resized.tobytes())
 
@@ -154,6 +159,15 @@ def YOLO(trialName, mice, RFID):
 
         # print(1/(time.time()-prev_time))
         updatedTags = []
+        if len(detections) > miceNum:
+            # Sort by the likelihood that it is a mouse, remove the least likely ones
+            sortedDetections = sorted(detections, key=lambda l: l[1])
+            while len(sortedDetections) > miceNum:
+                sortedDetections.remove(sortedDetections[0])
+            detections = sortedDetections
+
+        # =======================Startup Frames==============================
+
         if frameCount == 2 or (len(mice) == 0 and len(detections) == miceNum):
             for mouse in mice:
                 lostTrackers.append(mouse)
@@ -163,16 +177,12 @@ def YOLO(trialName, mice, RFID):
                 dummyTag += 1
                 error = True
             continue
+
         elif len(mice) == 0:
-            #Problem starting up
+            # Problem starting up
             continue
-        if len(detections) > miceNum:
-            #Sort by the likelihood that it is a mouse, remove the least likely ones
-            sortedDetections = sorted(detections, key=lambda l: l[1])
-            while len(sortedDetections) > miceNum:
-                sortedDetections.remove(sortedDetections[0])
-            detections = sortedDetections
         cleanedDetections = []
+
         # if len(detections) < miceNum:
         #     #Temp
         #     # print("bad frame")
@@ -181,20 +191,19 @@ def YOLO(trialName, mice, RFID):
         #     #     continue
         # if len(detections) == miceNum:
         #     badFrameCount = 0
-        #Adjustment: First assign the recently known mice, then the recently lost.
+
+
         """
+        ========================================Track Assignment=======================================================
         Approach 1: Assign each detection to its nearest mouse.
         Problem: When a mouse reappears, the detection is closer to a mouse that has been tracked throughout than the mouse.
         Approach 2: Assign each mouse to its nearest detection.
         Problem: When a mouse disappears, it can be assigned to a detection even if it was supposed to be gone.
         Approach 3: Sort pairs of detection and mouse by distance. Assign in order, until we run out of detections or mice.
-        Problem: Some inaccuracies. Adding lost pairs after the fact caused issues.
-        Approach 4: Munkres' Algorithm
         """
-        # TODO: Incorporate velocity
         # pairs = itertools.product(list(filter(lambda x: x.lastFrameCount == frameCount -1, mice)), detections)
         pairs = itertools.product(mice, detections)
-        pairs = sorted(pairs, key = lambda l: l[0].distanceFromPos((l[1][2][0], l[1][2][1])))
+        pairs = sorted(pairs, key=lambda l: l[0].distanceFromPos((l[1][2][0], l[1][2][1])))
         matrix = []
         for i in range(0, len(mice)):
             row = []
@@ -234,11 +243,13 @@ def YOLO(trialName, mice, RFID):
                 if len(partialLostTrackers) == 1 and mouse.tag() == partialLostTrackers[0].tag():
                     partialLostTrackers = []
         image = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
-        image = cvDrawBoxes(cleanedDetections, image)
-        cv2.imshow('Demo', image)
-        cv2.waitKey(3)
+        cvDrawBoxes(cleanedDetections, image, miceWithinDistance(mice, 200))
+        #cv2.imshow('Demo', image)
+        #cv2.waitKey(3)
+
+        # =============================Lost Mouse Handling=====================================================
         if len(cleanedDetections) < miceNum:
-            #Mice have been lost this frame!
+            #  Mice have been lost this frame!
             error = True
             for tracker in filter(lambda x: x.tag() not in updatedTags and x not in partialLostTrackers, mice):
                 partialLostTrackers.append(tracker)
@@ -248,9 +259,9 @@ def YOLO(trialName, mice, RFID):
                 else:
                     break
                 if nearest.distanceFromPos(tracker.getPosition()) < maxSwapDistance and nearest not in partialLostTrackers:
-                    #This checks if there is a mouse nearby to the one that just disappeared.
-                    #We also check if this mouse has an abrupt change in velocity
-                    #This indicates that we may get identity swaps.
+                    # This checks if there is a mouse nearby to the one that just disappeared.
+                    # We also check if this mouse has an abrupt change in velocity
+                    # This indicates that we may get identity swaps.
                     print(nearest.velocity)
                     print(tracker.tag(), tracker.getPosition())
                     print(nearest.tag(), nearest.getPosition())
@@ -258,53 +269,53 @@ def YOLO(trialName, mice, RFID):
                     #     continue
                     partialLostTrackers.append(nearest)
         if len(partialLostTrackers) > 1:
-            #Lost more than one? Then once it reappears we cannot know which it is.
-            #We now require the RFID.
+            # Lost more than one? Then once it reappears we cannot know which it is.
+            # We now require the RFID.
             print(list(map(lambda x: x.tag(), partialLostTrackers)))
             print(list(map(lambda x: x.tag(), mice)))
             for track in partialLostTrackers:
                 if track.tag() > 99999:
-                    #This is not a dummy tracker, we can find it again
+                    # This is not a dummy tracker, we can find it again
                     lostTrackers.append(track)
                 try:
                     mice.remove(track)
                     mice.append(MouseTracker(track.getPosition(), dummyTag, frameName, frameCount -1))
                 except ValueError:
-                    #for safety idk
+                    # for safety idk
                     pass
                 dummyTag += 1
             partialLostTrackers = []
 
-        if error == True:
-            #Check if we can match up a dummy mouse with a tag
+        # ======================================RFID Validation=========================================================
+        if error:
+            # Check if we can match up a dummy mouse with a tag
             if validationFrame:
                 ln = RFID[RFIDIndex].split(';')
                 position = list(int(item) for item in ln[1].strip('()\n').split(','))
                 for tracker in lostTrackers:
                     if int(ln[0]) == tracker.tag():
-                        foundTracker = True
-                        #Match!
+                        # Match!
                         print(tracker.tag())
                         print(position)
-                        position[0] *= 416/640
-                        position[1] *= 416/480
+                        position[0] *= 608/640
+                        position[1] *= 608/480
                         nearestMice = sorted(mice, key= lambda x: x.distanceFromPos(position))
                         print(list(map(lambda x: x.tag(), filter(lambda x: x.tag() < 99999, mice))))
                         if abs(nearestMice[0].distanceFromPos(position) - nearestMice[1].distanceFromPos(position)) < 30:
-                            #We cannot be certain which one is over the reader
+                            # We cannot be certain which one is over the reader
                             print("cannot be sure")
                             break
                         if nearestMice[0].tag() < 99999:
-                            #Anonymouse :)
+                            # Anonymouse :)
                             nearestAnon = nearestMice[0]
-                            print((nearestAnon.getPosition()[0]*640/416, nearestAnon.getPosition()[1]*480/416))
+                            print((nearestAnon.getPosition()[0]*640/608, nearestAnon.getPosition()[1]*480/608))
                             tracker.updatePositions(nearestAnon.recordedPositions)
                             tracker.validate()
                             mice.append(tracker)
                             lostTrackers.remove(tracker)
                             mice.remove(nearestAnon)
                         else:
-                            #There was an identity swap earlier. Correct for it
+                            # There was an identity swap earlier. Correct for it
                             print("identity swap")
                             badMouse = nearestMice[0]
                             incorrectPositions = badMouse.trimPositions()
@@ -318,24 +329,24 @@ def YOLO(trialName, mice, RFID):
                 av_x = 0.0
                 av_y = 0.0
                 for mouse in filter(lambda x: x.tag() < 99999, mice):
-                     av_x += mouse.getPosition()[0]
-                     av_y += mouse.getPosition()[1]
+                    av_x += mouse.getPosition()[0]
+                    av_y += mouse.getPosition()[1]
                 av_x /= len(lostTrackers)
                 av_y /= len(lostTrackers)
                 allMiceClose = True
                 for mouse in filter(lambda x: x.tag() < 99999, mice):
                     if mouse.distanceFromPos((av_x, av_y)) > 100:
-                        #Cannot approximate position as the average
+                        # Cannot approximate position as the average
                         allMiceClose = False
                 if allMiceClose:
                     for lostMouse in lostTrackers:
-                        #In order to not lose all data, save approximate location
-                        #if mice are close enough together. (e.g. sleeping in corner)
+                        # In order to not lose all data, save approximate location
+                        # if mice are close enough together. (e.g. sleeping in corner)
                         lostMouse.updatePosition([av_x, av_y], frameName, frameCount -1)
 
             if len(lostTrackers) == 1:
                 print("one")
-                #Only one lost mouse = only one possibility
+                # Only one lost mouse = only one possibility
                 print(list(map(lambda x: x.tag(), filter(lambda x: x.tag() < 99999, mice))))
                 missingMouse = list(filter(lambda x: x.tag() < 99999, mice))[0]
                 lostTrackers[0].updatePositions(missingMouse.recordedPositions)
@@ -351,12 +362,12 @@ def YOLO(trialName, mice, RFID):
         elif validationFrame:
             ln = RFID[RFIDIndex].split(';')
             readerPos = list(int(item) for item in ln[1].strip('()\n').split(','))
-            readerPos[0] *= 416/640
-            readerPos[1] *= 416/480
+            readerPos[0] *= 608/640
+            readerPos[1] *= 608/480
             nearestMice = sorted(mice, key= lambda x: x.distanceFromPos(readerPos))
             if abs(nearestMice[0].distanceFromPos(readerPos) - nearestMice[1].distanceFromPos(readerPos)) > 50:
                 if nearestMice[0].tag() != int(ln[0]):
-                    #An identity swap has occured. Remove the frames up to the last validation point.
+                    # An identity swap has occured. Remove the frames up to the last validation point.
                     actualMouse = list(filter(lambda x: x.tag() == int(ln[0]), mice))[0]
                     actualPosition = [actualMouse.getPosition()[0], actualMouse.getPosition()[1]]
                     actualWidth = actualMouse.getPosition()[4]
@@ -373,6 +384,7 @@ def YOLO(trialName, mice, RFID):
                     nearestMice[0].validate()
 
         # input("next")
+        print("next")
     mouseDict = {}
     for mouse in mouseTrackers:
         mouseDict.update({mouse.tag(): mouse.recordedPositions})
@@ -380,14 +392,15 @@ def YOLO(trialName, mice, RFID):
     with open("processed.json", "w") as outfile:
         json.dump(mouseDict, outfile, ensure_ascii=False)
 
+
 if __name__ == "__main__":
     mouseTrackers = []
     tags = tuple(int(x.strip()) for x in input("Please input the mouse tags, separated by commas").split(','))
     print(tags)
     for tag in tags:
-        mouseTrackers.append(MouseTracker([0,0], tag))
+        mouseTrackers.append(MouseTracker([0, 0], tag))
     RFIDResponses = []
-    dataFileName = "RTS_test.txt"
+    dataFileName = "RTS_test_shaved.txt"
     file = open(dataFileName, "r")
     RFIDResponses = file.readlines()
     YOLO("verify", mouseTrackers, RFIDResponses)

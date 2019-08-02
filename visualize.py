@@ -23,8 +23,8 @@ if temp[0].lower() == 'y':
     plt.imshow(img)
     plt.axis((0, 640, 0, 480))
     for datum in darkData.values():
-        x = list(map(lambda l : int(l[0]*640/416), datum))
-        y = list(map(lambda l : int(l[1]*640/416), datum))
+        x = list(map(lambda l : int(l[0]*640/608), datum))
+        y = list(map(lambda l : int(l[1]*480/608), datum))
         plt.plot(x, y)
     plt.show()
 if True:
