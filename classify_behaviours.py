@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import math
 
 totalFrames = 17404
 def distanceBetweenPos(p1, p2):
@@ -8,7 +9,7 @@ def distanceBetweenPos(p1, p2):
     x1, y1, x2, y2 = p1[0][0], p1[0][1], p2[0][0], p2[0][1]
     return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 group_radius = 120
-social_radius = 200
+social_radius = 150
 
 
 def convertBack(x, y, w, h):
@@ -77,14 +78,13 @@ for i in range(0, totalFrames):
                 if dist and dist < group_radius:
                     group.add(mouse)
                     group.add(other)
-                elif dist and dist < social_radius and dist > 180 and velocities[mouse] is not None:
+                elif dist and dist < social_radius and velocities[mouse] is not None:
                     dist_vector = (other_pos[i][0][0] - positions[i][0][0],
                         other_pos[i][0][1] - positions[i][0][1])
-                    angle = np.arctan(dist_vector[1]/dist_vector[0]) * (180/np.pi)
-                    vel_angle = np.arctan(velocities[mouse][1]/velocities[mouse][0]) * (180/np.pi)
-                    if abs(vel_angle - angle) < 20 and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > 2:
-                        print(velocities[mouse])
-                        print(angle, vel_angle, i)
+                    dot = dist_vector[0]*velocities[mouse][0] + dist_vector[1]*velocities[mouse][1]
+                    det = dist_vector[0]*velocities[mouse][1] - dist_vector[1]*velocities[mouse][0]
+                    angle = math.atan2(det, dot)*(180/np.pi)  # atan2(y, x) or atan2(sin, cos)
+                    if abs(angle) < 20 and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > 2:
                         if len(approaches[mouse]) == 0 or  approaches[mouse][-1][0] < i -10:
                             approaches[mouse].append((i, other))
     if len(group) == 2 and len(lastGroup) < 2:
