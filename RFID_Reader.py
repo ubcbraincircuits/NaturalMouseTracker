@@ -138,8 +138,10 @@ def record():
     """
     RFID_timeout = 0.015
     RFID_doCheckSum = True
-    reader1 = TagReader (RFID_serialPort, RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    reader2 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader0 = TagReader (RFID_serialPort, RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader1 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader2 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader3 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     with open ("RTS_test.txt" , "w") as f:
 
         time.sleep(0.25)
@@ -150,24 +152,34 @@ def record():
         vs.camera.exposure_mode = "off"
         time.sleep(2)
         startTime = time.time()
-        thread0 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 0))
-        thread1 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 1))
+        thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
+        thread1 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 1))
+        thread2 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 2))
+        thread3 = threading.Thread(target=scan, daemon= True, args=(reader3, f, 3))
         thread0.start()
         thread1.start()
+        thread2.start()
+        thread3.start()
         while True:
             try:
                 frame, frameCount = vs.read()
-                #cv2.imshow("Mouse Tracking", frame)
-                #key = cv2.waitKey(1)& 0xFF
+                cv2.imshow("Mouse Tracking", frame)
+                key = cv2.waitKey(1)& 0xFF
                 #gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 #frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
                 #cv2.imwrite("frameData/" + frameName, gray)
                 if not thread0.is_alive():
-                    thread0 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 0))
+                    thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
                     thread0.start()
                 if not thread1.is_alive():
-                    thread1 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 1))
+                    thread1 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 1))
                     thread1.start()
+                if not thread2.is_alive():
+                    thread2 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 2))
+                    thread2.start()
+                if not thread3.is_alive():
+                    thread3 = threading.Thread(target=scan, daemon= True, args=(reader3, f, 3))
+                    thread3.start()
             except KeyboardInterrupt:
                break
         cv2.destroyAllWindows()

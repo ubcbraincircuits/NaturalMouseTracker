@@ -4,9 +4,11 @@ Slightly changed from the imutils package to accomodate this system.
 Credit to the authors of imutils.
 """
 from picamera.array import PiRGBArray
+import datetime
 from picamera import PiCamera
 from threading import Thread
 from queue import Queue
+import os
 import cv2
 
 class PiVideoStream:
@@ -16,6 +18,8 @@ class PiVideoStream:
 		self.trialName = trialName
 		self.camera.resolution = resolution
 		self.camera.framerate = framerate
+		self.folder = "/mnt/frameData/" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+		os.mkdir(self.folder) 
 		self.rawCapture = PiRGBArray(self.camera, size=resolution)
 		self.stream = self.camera.capture_continuous(self.rawCapture,
 			format="bgr", use_video_port=True)
@@ -42,8 +46,7 @@ class PiVideoStream:
                         frame, frameCount = self.frames.get()
                         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                         frameName = 'tracking_system' + self.trialName + str(frameCount) + '.png'
-                        folderIndex = int(frameCount/20000)
-                        cv2.imwrite("frameData" + str(folderIndex)+" /" + frameName, gray)
+                        cv2.imwrite(self.folder + "/" + frameName, gray)
                         self.frames.task_done()
                         
 	def update(self):
