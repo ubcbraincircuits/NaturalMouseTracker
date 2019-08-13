@@ -14,6 +14,7 @@ import darknet
 import json
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
+import argparse
 import itertools
 from munkres import Munkres
 from shutil import copyfile
@@ -75,7 +76,7 @@ def miceWithinDistance(mice, distance):
     return within_dist
 
 
-def YOLO(trialName, mice, RFID):
+def YOLO(trialName, mice, RFID, showVideo, dataPath):
     miceNum = len(mice)
 
     global metaMain, netMain, altNames
@@ -141,8 +142,8 @@ def YOLO(trialName, mice, RFID):
         RFIDIndices = []
         try:
             validationFrame = False
-            frameName = "frameData_4mice/tracking_system" + trialName + str(frameCount) + ".png"
-            while "frameData_4mice/" + RFID[lastRFIDIndex + 1].split(';')[2].strip('\n') == frameName:
+            frameName = "frameData" + dataPath + "/tracking_system" + trialName + str(frameCount) + ".png"
+            while "frameData" + dataPath + "/" + RFID[lastRFIDIndex + 1].split(';')[2].strip('\n') == frameName:
                 RFIDIndices.append(lastRFIDIndex + 1)
                 validationFrame = True
                 lastRFIDIndex += 1
@@ -155,11 +156,13 @@ def YOLO(trialName, mice, RFID):
                                         darknet.network_height(netMain)),
                                        interpolation=cv2.INTER_LINEAR)
         except Exception as e:
+            print(frameName)
+            print(str(e))
             # no more frames
             break
         darknet.copy_image_from_bytes(darknet_image,frame_resized.tobytes())
 
-        detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.5)
+        detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.4)
 
         # print(1/(time.time()-prev_time))
         updatedTags = []
@@ -247,9 +250,10 @@ def YOLO(trialName, mice, RFID):
                 if len(partialLostTrackers) == 1 and mouse.tag() == partialLostTrackers[0].tag():
                     partialLostTrackers = []
         image = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
-        # cvDrawBoxes(cleanedDetections, image, miceWithinDistance(mice, 200), frameCount)
-        # cv2.imshow('Demo', image)
-        # cv2.waitKey(3)
+        if showVideo:
+            cvDrawBoxes(cleanedDetections, image, miceWithinDistance(mice, 200), frameCount)
+            cv2.imshow('Demo', image)
+            cv2.waitKey(3)
 
         # =============================Lost Mouse Handling=====================================================
         if len(cleanedDetections) < miceNum:
@@ -400,13 +404,21 @@ def YOLO(trialName, mice, RFID):
 
 
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-v", "--video", help="1 for showing video, 0 or blank for not")
+    ap.add_argument("-n", "--name", help="Name of the frame folder/text file")
+    args = vars(ap.parse_args())
+    showVideo = False
+    if args.get("video", None) is not None:
+        showVideo = True
     mouseTrackers = []
     tags = tuple(int(x.strip()) for x in input("Please input the mouse tags, separated by commas").split(','))
     print(tags)
     for tag in tags:
         mouseTrackers.append(MouseTracker([0, 0], tag))
     RFIDResponses = []
-    dataFileName = "RTS_test_4mice.txt"
+    dataFileName = "RTS_test"
+    dataFileName += args.get("name", "") + ".txt"
     file = open(dataFileName, "r")
     RFIDResponses = file.readlines()
-    YOLO("base_tracking", mouseTrackers, RFIDResponses)
+    YOLO("base_tracking", mouseTrackers, RFIDResponses, showVideo, args.get("name", ""))
