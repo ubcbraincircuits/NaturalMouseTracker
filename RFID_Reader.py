@@ -189,7 +189,7 @@ if __name__=="__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("-t", "--text", help="path to the text file")
     ap.add_argument("-n", "--name", default ="base_tracking", help="trial name")
-    ap.add_argument("-c", "--count", default =0, help="initial count")
+    ap.add_argument("-c", "--count", default =1, help="initial count")
     args = vars(ap.parse_args())
     if args.get("text", None) is not None:
         fileName = args.get('text')
