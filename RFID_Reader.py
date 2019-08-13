@@ -21,7 +21,7 @@ ProT = [None]*18
 ##    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
 ##    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
 ##]
-readerMap = [(103,120), (525, 310)]
+readerMap = [(525,310),(525, 120), (103, 310), (103, 120)]
 #Hex I2C Addresses of all ProTrinkets
 ProT [0] = 0x11
 ProT [1] = 0x12
@@ -138,10 +138,10 @@ def record():
     """
     RFID_timeout = 0.015
     RFID_doCheckSum = True
-    reader0 = TagReader (RFID_serialPort, RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    reader1 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    reader2 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    reader3 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader0 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader1 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader2 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader3 = TagReader ('/dev/ttyUSB0', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     with open ("RTS_test.txt" , "w") as f:
 
         time.sleep(0.25)
