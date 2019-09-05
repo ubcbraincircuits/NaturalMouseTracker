@@ -12,6 +12,8 @@ class MouseTracker:
         if startCoord != [0,0]:
             startCoord.append(frame)
             startCoord.append(frameCount)
+            startCoord.append(width)
+            startCoord.append(height)
             self.positionQueue.append(startCoord)
             self.recordedPositions = [startCoord]
         else:
@@ -50,10 +52,9 @@ class MouseTracker:
         self.currCoord = self.recordedPositions[self.validatedIndex]
 
     def trimPositions(self, frameCount = 0):
-        try:
-            index = next(i for i,v in enumerate(self.recordedPositions) if (lambda v: v[3] == frameCount))
-        except StopIteration:
-            index = 0
+        for rec in self.recordedPositions:
+            if rec[3] >= frameCount:
+                index = self.recordedPositions.index(rec)
         if index > self.validatedIndex:
             self.validatedIndex = index
         tempPositions = self.recordedPositions[self.validatedIndex + 1:]

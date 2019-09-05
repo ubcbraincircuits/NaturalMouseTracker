@@ -12,14 +12,15 @@ def convertBack(x, y, w, h):
     ymin = int(round(y - (h / 2)))
     ymax = int(round(y + (h / 2)))
     return xmin, ymin, xmax, ymax
-trialName = "verify"
+trialName = "base_tracking"
+dataPath = "_08132019"
 darkFile = open("processed.json", "r")
 darkData = json.loads(darkFile.read())
 
 temp = input("Show overall track?")
 if temp[0].lower() == 'y':
     fig = plt.figure()
-    img = mpimg.imread("frameData_4mice/tracking_system" + trialName + "1.png")
+    img = mpimg.imread("frameData_08132019/tracking_system" + trialName + "1.png")
     plt.imshow(img)
     plt.axis((0, 640, 0, 480))
     for datum in darkData.values():
@@ -29,11 +30,18 @@ if temp[0].lower() == 'y':
     plt.show()
 if True:
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
-    video = cv2.VideoWriter('output_pairs4mice.avi',fourcc, 20.0, (640, 480))
+    #video = cv2.VideoWriter('output_pairs08132019.avi',fourcc, 15.0, (640, 480))
     frameCount = 2
+    lastFrameDict = {}
+    fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
+    videos = {}
+    os.mkdir("videos" + dataPath)
+    for tag in darkData.keys():
+        videos.update({tag: cv2.VideoWriter("videos" + dataPath + "/" tag + dataPath + ".avi" ,fourcc, 15.0, (640, 480))})
+        lastFrameDict.update({tag: 0})
     while True:
         try:
-            frameName = "frameData_4mice/tracking_system" + trialName + str(frameCount) + ".png"
+            frameName = "frameData_08132019/tracking_system" + trialName + str(frameCount) + ".png"
             frame_read = cv2.imread(frameName)
             frameCount += 1
             frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
@@ -42,24 +50,35 @@ if True:
             print(str(e))
             break
         for (tag, datum) in darkData.items():
-            for position in datum:
-                if position[2]==frameName:
-                    x, y, w, h = position[0]*640/608,\
-                        position[1]*480/608,\
-                        position[4]*640/608,\
-                        position[5]*480/608
+            while True:
+                if len(datum) <= lastFrameDict[tag]:
+                    break
+                if datum[lastFrameDict[tag]][3] == frameCount:
+                    x, y, w, h = datum[lastFrameDict[tag]][0]*640/608,\
+                        datum[lastFrameDict[tag]][1]*480/608,\
+                        datum[lastFrameDict[tag]][4]*640/608,\
+                        datum[lastFrameDict[tag]][5]*480/608
                     xmin, ymin, xmax, ymax = convertBack(
                         float(x), float(y), float(w), float(h))
                     pt1 = (xmin, ymin)
                     pt2 = (xmax, ymax)
-                    cv2.rectangle(frame_rgb, pt1, pt2, (0, 255, 0), 1)
-                    cv2.putText(frame_rgb,
-                                str(tag),
-                                (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                                [0, 255, 0], 2)
-        video.write(frame_rgb)
+                    blank_image = np.ones((480,640,3), np.uint8)*255
+                    blank_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] = frame_rgb[pt1[1]:pt2[1], pt1[0]:pt2[0]]
+                    videos[tag].write(blank_image)
+                    # cv2.rectangle(frame_rgb, pt1, pt2, (0, 255, 0), 1)
+                    # cv2.putText(frame_rgb,
+                    #             str(tag),
+                    #             (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                    #             [0, 255, 0], 2)
+                    break
+                elif datum[lastFrameDict[tag]][3] < frameCount:
+                    lastFrameDict[tag] += 1
+                else:
+                    break
+        #video.write(frame_rgb)
     cv2.destroyAllWindows()
-    video.release()
+    for video in videos.values():
+        video.release()
 
 
 
@@ -68,7 +87,7 @@ while cont is not 'n':
     frameCount = input("Input your desired validation frame number")
     if int(frameCount) > -1:
         fig = plt.figure()
-        frameName = "frameData_4mice/tracking_system" + trialName + str(frameCount) + ".png"
+        frameName = "frameData_08132019/tracking_system" + trialName + str(frameCount) + ".png"
         img = cv2.imread(frameName)
         for (tag, datum) in darkData.items():
             for position in datum:

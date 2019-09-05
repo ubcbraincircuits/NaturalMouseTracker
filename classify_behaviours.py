@@ -2,7 +2,7 @@ import json
 import numpy as np
 import math
 
-totalFrames = 17404
+totalFrames = 10936
 def distanceBetweenPos(p1, p2):
     if p1 is None or p2 is None:
         return False
@@ -67,6 +67,8 @@ lastGroup = set()
 for i in range(0, totalFrames):
     group = set()
     for mouse, positions in mouseDict.items():
+        if len(positions) <= i:
+            break
         if i > 4 and positions[i-5] is not None and positions[i] is not None:
             velocities.update({mouse:(positions[i][0][0] - positions[i-5][0][0],
                 positions[i][0][1] - positions[i-5][0][1])})
@@ -74,6 +76,8 @@ for i in range(0, totalFrames):
             velocities.update({mouse: None})
         for other, other_pos in mouseDict.items():
             if mouse != other:
+                if len(positions) <= i or len(other_pos) <= i:
+                    continue
                 dist = distanceBetweenPos(positions[i], other_pos[i])
                 if dist and dist < group_radius:
                     group.add(mouse)
