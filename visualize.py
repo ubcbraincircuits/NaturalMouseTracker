@@ -3,6 +3,9 @@ import matplotlib.image as mpimg
 import numpy as np
 import cv2
 import json
+import os
+import shutil
+import argparse
 from MouseTracker import MouseTracker
 from time import sleep
 
@@ -13,14 +16,17 @@ def convertBack(x, y, w, h):
     ymax = int(round(y + (h / 2)))
     return xmin, ymin, xmax, ymax
 trialName = "base_tracking"
-dataPath = "_08132019"
+ap = argparse.ArgumentParser()
+ap.add_argument("-n", "--name", help="Name of the frame folder/text file")
+args = vars(ap.parse_args())
+dataPath = args.get("name", "_08132019")
 darkFile = open("processed.json", "r")
 darkData = json.loads(darkFile.read())
 
 temp = input("Show overall track?")
 if temp[0].lower() == 'y':
     fig = plt.figure()
-    img = mpimg.imread("frameData_08132019/tracking_system" + trialName + "1.png")
+    img = mpimg.imread("frameData" + dataPath + "/tracking_system" + trialName + "1.png")
     plt.imshow(img)
     plt.axis((0, 640, 0, 480))
     for datum in darkData.values():
@@ -35,13 +41,16 @@ if True:
     lastFrameDict = {}
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
     videos = {}
+    files = {}
+    shutil.rmtree("videos" + dataPath)
     os.mkdir("videos" + dataPath)
     for tag in darkData.keys():
-        videos.update({tag: cv2.VideoWriter("videos" + dataPath + "/" tag + dataPath + ".avi" ,fourcc, 15.0, (640, 480))})
+        videos.update({tag: cv2.VideoWriter("videos" + dataPath + "/" + tag + ".avi" ,fourcc, 15.0, (640, 480))})
         lastFrameDict.update({tag: 0})
+        files.update({tag: open("videos" + dataPath + "/"+ tag + ".txt", "w")})
     while True:
         try:
-            frameName = "frameData_08132019/tracking_system" + trialName + str(frameCount) + ".png"
+            frameName = "frameData"+ dataPath + "/tracking_system" + trialName + str(frameCount) + ".png"
             frame_read = cv2.imread(frameName)
             frameCount += 1
             frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
@@ -65,6 +74,7 @@ if True:
                     blank_image = np.ones((480,640,3), np.uint8)*255
                     blank_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] = frame_rgb[pt1[1]:pt2[1], pt1[0]:pt2[0]]
                     videos[tag].write(blank_image)
+                    files[tag].write(str(frameCount))
                     # cv2.rectangle(frame_rgb, pt1, pt2, (0, 255, 0), 1)
                     # cv2.putText(frame_rgb,
                     #             str(tag),
@@ -79,6 +89,8 @@ if True:
     cv2.destroyAllWindows()
     for video in videos.values():
         video.release()
+    for file in files.values():
+        file.close()
 
 
 
