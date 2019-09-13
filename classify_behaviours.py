@@ -42,10 +42,12 @@ while True:
                         position[1]*480/608, 0, 0
                 xmin, ymin, xmax, ymax = convertBack(
                     float(x), float(y), float(w), float(h))
+                head_pos = (position[6], position[7])
+                tail_pos = (position[8], position[9])
                 center = (x, y)
                 pt1 = (xmin, ymin)
                 pt2 = (xmax, ymax)
-                pos = [center, pt1, pt2]
+                pos = [center, pt1, pt2, head_pos, tail_pos]
                 mouseDict[tag].append(pos)
                 break
             elif position[3] > frameCount:

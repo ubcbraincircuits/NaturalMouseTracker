@@ -359,7 +359,7 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
     for mouse in mouseTrackers:
         mouseDict.update({mouse.tag(): mouse.recordedPositions})
         print(mouse.tag(), str(len(mouse.recordedPositions)/frameCount*100) + "% Covered")
-    with open("processed.json", "w") as outfile:
+    with open("processed" + dataPath+ ".json", "w") as outfile:
         json.dump(mouseDict, outfile, ensure_ascii=False)
 
 

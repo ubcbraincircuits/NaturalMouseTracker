@@ -3,8 +3,7 @@ echo Hello!
 SET the_path=%cd%
 set /p name="Enter name of the frame folder/text file: "
 cd darknet
-dir
-rem C:/Python36/python.exe darknet_video.py -n %name%
+C:/Python36/python.exe darknet_video.py -n %name%
 C:/Python36/python.exe visualize.py -n %name%
 cd ../
 python head_tail_label.py -n %name%
