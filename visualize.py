@@ -20,7 +20,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("-n", "--name", help="Name of the frame folder/text file")
 args = vars(ap.parse_args())
 dataPath = args.get("name", "_08132019")
-darkFile = open("processed.json", "r")
+darkFile = open("processed" + dataPath + ".json", "r")
 darkData = json.loads(darkFile.read())
 
 temp = input("Show overall track?")
@@ -42,8 +42,13 @@ if True:
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
     videos = {}
     files = {}
-    shutil.rmtree("videos" + dataPath)
-    os.mkdir("videos" + dataPath)
+    try:
+        shutil.rmtree("videos" + dataPath)
+    except Exception as e:
+        print(str(e))
+        pass
+    finally:
+        os.mkdir("videos" + dataPath)
     for tag in darkData.keys():
         videos.update({tag: cv2.VideoWriter("videos" + dataPath + "/" + tag + ".avi" ,fourcc, 15.0, (640, 480))})
         lastFrameDict.update({tag: 0})
@@ -74,7 +79,7 @@ if True:
                     blank_image = np.ones((480,640,3), np.uint8)*255
                     blank_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] = frame_rgb[pt1[1]:pt2[1], pt1[0]:pt2[0]]
                     videos[tag].write(blank_image)
-                    files[tag].write(str(frameCount))
+                    files[tag].write(str(frameCount) + "\n")
                     # cv2.rectangle(frame_rgb, pt1, pt2, (0, 255, 0), 1)
                     # cv2.putText(frame_rgb,
                     #             str(tag),
