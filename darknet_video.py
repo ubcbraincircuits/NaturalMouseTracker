@@ -58,7 +58,7 @@ def cvDrawBoxes(detections, img, mice_together, frameCount):
 netMain = None
 metaMain = None
 altNames = None
-maxSwapDistance = 50
+maxSwapDistance = 75
 minSwapVelocity = 5
 
 
@@ -194,7 +194,7 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
         """
         # pairs = itertools.product(list(filter(lambda x: x.lastFrameCount == frameCount -1, mice)), detections)
         pairs = itertools.product(mice, detections)
-        pairs = sorted(pairs, key=lambda l: l[0].distanceFromPos((l[1][2][0], l[1][2][1])))
+        pairs = sorted(pairs, key=lambda l: l[0].intersectionOverUnion(l[1][2]), reverse = True)
         matrix = []
         for i in range(0, len(mice)):
             row = []
@@ -318,11 +318,11 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
                         if mouse.distanceFromPos((av_x, av_y)) > 100:
                             # Cannot approximate position as the average
                             allMiceClose = False
-                    if allMiceClose:
-                        for lostMouse in lostTrackers:
-                            # In order to not lose all data, save approximate location
-                            # if mice are close enough together. (e.g. sleeping in corner)
-                            lostMouse.updatePosition([av_x, av_y], frameName, frameCount -1)
+                    # if allMiceClose:
+                    #     for lostMouse in lostTrackers:
+                    #         # In order to not lose all data, save approximate location
+                    #         # if mice are close enough together. (e.g. sleeping in corner)
+                    #         lostMouse.updatePosition([av_x, av_y], frameName, frameCount -1)
 
                 if len(lostTrackers) == 1:
                     # Only one lost mouse = only one possibility

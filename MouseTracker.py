@@ -72,6 +72,34 @@ class MouseTracker:
         y2 = pos[1]
         return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 
+    def intersectionOverUnion (self, pos):
+            selfArea = self.currCoord[4]*self.currCoord[5]
+            if selfArea == 0:
+                return 0
+            posArea = pos[2]*pos[3]
+            selfMinX = self.currCoord[0] - self.currCoord[4]/2
+            selfMaxX = self.currCoord[0] + self.currCoord[4]/2
+            selfMinY = self.currCoord[1] - self.currCoord[5]/2
+            selfMaxY = self.currCoord[1] + self.currCoord[5]/2
+
+            otherMinX = pos[0] - pos[2]/2
+            otherMaxX = pos[0] + pos[2]/2
+            otherMinY = pos[1] - pos[3]/2
+            otherMaxY = pos[1] + pos[3]/2
+
+            # Compute the intersection boundaries
+            interLeft   = max(selfMinX, otherMinX);
+            interTop    = max(selfMinY, otherMinY);
+            interRight  = min(selfMaxX, otherMaxX);
+            interBottom = min(selfMaxY, otherMaxY);
+            # If the intersection is valid (positive non zero area), then there is an intersection
+            if ((interLeft < interRight) and (interTop < interBottom)):
+                intersection = (interRight - interLeft)*(interBottom - interTop)
+            else:
+                intersection = 0
+            union = posArea + selfArea - intersection
+            return intersection/union
+
     def bundled(self):
         return self.bundled
 
