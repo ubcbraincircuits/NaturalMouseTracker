@@ -58,7 +58,7 @@ def cvDrawBoxes(detections, img, mice_together, frameCount):
 netMain = None
 metaMain = None
 altNames = None
-maxSwapDistance = 100
+maxSwapDistance = 50
 minSwapVelocity = 5
 
 
@@ -133,6 +133,8 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
     badFrameCount = 0
     lastRFIDIndex = -1
     pairFinder = Munkres()
+    event = {"identity_swap": 0, 'dummy_swap': 0, 'lost_mouse': 0} #dictionary to hold events key = event name, value = number of occurences
+    badDetections = 0
     while True:
         RFIDIndices = []
         try:
@@ -228,6 +230,7 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
 
         # =============================Lost Mouse Handling=====================================================
         if len(cleanedDetections) < miceNum:
+            badDetections += 1
             #  Mice have been lost this frame!
             error = True
             for tracker in filter(lambda x: x.tag() not in updatedTags and x not in partialLostTrackers, mice):
@@ -247,6 +250,7 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
         if len(partialLostTrackers) > 1:
             # Lost more than one? Then once it reappears we cannot know which it is.
             # We now require the RFID.
+            event["lost_mouse"] += 1
             for track in partialLostTrackers:
                 if track.tag() > 99999:
                     # This is not a dummy tracker, we can find it again
@@ -287,12 +291,16 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
                                 lostTrackers.remove(tracker)
                                 mice.remove(nearestAnon)
                             else:
-                                # There was an identity swap earlier. Correct for it
+                                # There was an identity swap earlier. Correct for it AND increment number of identity swap
                                 print("identity swap")
+                                event["dummy_swap"] += 1
                                 badMouse = nearestMice[0]
-                                incorrectPositions = badMouse.trimPositions()
+                                occlusionEndPoint = badMouse.occlusionPointBefore(list(filter(lambda x: x.tag() != badMouse.tag(), mice)), maxSwapDistance)
+                                incorrectPositions = badMouse.trimPositions(occlusionEndPoint)
                                 tracker.updatePositions(incorrectPositions)
                                 tracker.validate()
+                                occlusionStartPoint = badMouse.occlusionPointAfter(list(filter(lambda x: x.tag() != badMouse.tag(), mice)), maxSwapDistance)
+                                badMouse.trimPositions(occlusionStartPoint)
                                 mice.append(tracker)
                                 lostTrackers.remove(tracker)
                                 lostTrackers.append(badMouse)
@@ -338,19 +346,26 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
                 nearestMice = sorted(mice, key= lambda x: x.distanceFromPos(readerPos))
                 if abs(nearestMice[0].distanceFromPos(readerPos) - nearestMice[1].distanceFromPos(readerPos)) > 50:
                     if nearestMice[0].tag() != int(ln[0]):
+                        #Identity swap, increment number identity swaps
+                        event["identity_swap"] += 1
                         # An identity swap has occured. Remove the frames up to the last validation point.
+                        print(list(map(lambda x:x.tag(), mice)))
                         actualMouse = list(filter(lambda x: x.tag() == int(ln[0]), mice))[0]
-                        actualPosition = [actualMouse.getPosition()[0], actualMouse.getPosition()[1]]
-                        actualWidth = actualMouse.getPosition()[4]
-                        actualHeight = actualMouse.getPosition()[5]
-                        lastKnownFrame0 = actualMouse.lastValidatedPosition()[3]
-                        lastKnownFrame1 = nearestMice[0].lastValidatedPosition()[3]
-                        lastKnownFrame = max(lastKnownFrame0, lastKnownFrame1)
-                        actualMouse.trimPositions(lastKnownFrame)
-                        nearestMice[0].trimPositions(lastKnownFrame)
-                        actualMouse.updatePosition(readerPos, frameName, frameCount-1,nearestMice[0].getPosition()[4], nearestMice[0].getPosition()[5])
+                        #Find first valid point of current track
+                        actualOcclusionEndPoint = actualMouse.occlusionPointBefore(list(filter(lambda x: x.tag() != actualMouse.tag(), mice)), maxSwapDistance)
+                        nearOcclusionEndPoint = nearestMice[0].occlusionPointBefore(list(filter(lambda x: x.tag() != nearestMice[0].tag(), mice)), maxSwapDistance)
+                        nearPositions_new = actualMouse.trimPositions(actualOcclusionEndPoint)
+                        actualPositions_new = nearestMice[0].trimPositions(nearOcclusionEndPoint)
+                        #Find last valid point of old track
+                        nearOcclusionStartPoint = actualMouse.occlusionPointAfter(list(filter(lambda x: x.tag() != actualMouse.tag(), mice)), maxSwapDistance)
+                        actualOcclusionStartPoint = nearestMice[0].occlusionPointAfter(list(filter(lambda x: x.tag() != nearestMice[0].tag(), mice)), maxSwapDistance)
+                        #remove all occlusioned track
+                        actualMouse.trimPositions(actualOcclusionStartPoint)
+                        nearestMice[0].trimPositions(nearOcclusionStartPoint)
+                        #Reassign current tracks
+                        actualMouse.updatePositions(actualPositions_new)
                         actualMouse.validate()
-                        nearestMice[0].updatePosition(actualPosition, frameName, frameCount-1, actualWidth, actualHeight)
+                        nearestMice[0].updatePositions(nearPositions_new)
                     else:
                         nearestMice[0].validate()
 
@@ -359,7 +374,9 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
     for mouse in mouseTrackers:
         mouseDict.update({mouse.tag(): mouse.recordedPositions})
         print(mouse.tag(), str(len(mouse.recordedPositions)/frameCount*100) + "% Covered")
-    with open("processed.json", "w") as outfile:
+    print(event)
+    print("frames without all mice: ", badDetections, badDetections/frameCount*100,  "% error")
+    with open("processed" + dataPath+ ".json", "w") as outfile:
         json.dump(mouseDict, outfile, ensure_ascii=False)
 
 
