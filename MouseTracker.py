@@ -78,6 +78,63 @@ class MouseTracker:
     def tag(self):
         return self.id
 
+    def occlusionPointBefore(self, others, distance):
+        """
+        Examines the recorded positions of the mouse and compares them
+        to all other mice locations. The last known point where this mouse
+        was near to another will be defined as the end of its last occlusion.
+        """
+        lastCheckedFrameDict = {}
+        for mouse in others:
+            lastCheckedFrameDict.update({mouse.tag(): len(mouse.recordedPositions) -1})
+        occlusionPoint = len(self.recordedPositions) -1
+        endLoop = False
+        for i in range(len(self.recordedPositions)-1, 0):
+            for mouse in others:
+                while self.recordedPositions[i][3] > mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
+                    lastCheckedFrameDict[mouse.tag()] -= 1
+                if self.recordedPositions[i][3] == mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
+                    x1, y1 = self.recordedPositions[i][0], self.recordedPositions[i][1]
+                    x2, y2 = mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][0], mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][1]
+                    if (np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))) >= distance:
+                        occlusionPoint = self.recordedPositions[i][3]
+                        endLoop = True
+                        break
+            if endLoop:
+                break
+        return occlusionPoint
+
+    def occlusionPointAfter(self, others, distance):
+        """
+        Examines the recorded positions of the mouse and compares them
+        to all other mice locations. The first point after the last validation
+        of this mouse where it is near to another will be defined
+        as the beginning of its first occlusion.
+        """
+        lastCheckedFrameDict = {}
+        for mouse in others:
+            lastCheckedFrameDict.update({mouse.tag(): 0})
+        occlusionPoint = self.validatedIndex
+        endLoop = False
+        for i in range(self.validatedIndex, len(self.recordedPositions)):
+            for mouse in others:
+                while self.recordedPositions[i][3] > mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
+                    lastCheckedFrameDict[mouse.tag()] -= 1
+                if self.recordedPositions[i][3] == mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
+                    x1, y1 = self.recordedPositions[i][0], self.recordedPositions[i][1]
+                    x2, y2 = mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][0], mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][1]
+                    if (np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))) >= distance:
+                        occlusionPoint = self.recordedPositions[i][3]
+                        endLoop = True
+                        break
+            if endLoop:
+                break
+        return occlusionPoint
+        pass
+
+
+
+
 """
     We have 5 mice
     at positions (1,1), (232, 222), (77, 11), (2, 10), (72, 8)
