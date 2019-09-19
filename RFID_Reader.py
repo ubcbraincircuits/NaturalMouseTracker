@@ -21,7 +21,7 @@ ProT = [None]*18
 ##    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
 ##    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
 ##]
-readerMap = [(525,310),(525, 120), (103, 310), (103, 120)]
+readerMap = [(103,310),(525, 120),(525,310),(103,120)]
 #Hex I2C Addresses of all ProTrinkets
 ProT [0] = 0x11
 ProT [1] = 0x12
@@ -142,13 +142,13 @@ def record():
     reader1 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader2 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader3 = TagReader ('/dev/ttyUSB0', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    with open ("RTS_test.txt" , "w") as f:
+    vs = PiVideoStream(resolution=(640,480), trialName=trialName).start()
+    with open (vs.folder + "/RTS_test.txt" , "w") as f:
 
         time.sleep(0.25)
         firstFrame = cv2.imread("ref.jpg")
         firstFrame = cv2.cvtColor(firstFrame, cv2.COLOR_BGR2GRAY)
         needPulse = False
-        vs = PiVideoStream(resolution=(640,480), trialName=trialName).start()
         vs.camera.exposure_mode = "off"
         time.sleep(2)
         startTime = time.time()
@@ -163,8 +163,8 @@ def record():
         while True:
             try:
                 frame, frameCount = vs.read()
-                cv2.imshow("Mouse Tracking", frame)
-                key = cv2.waitKey(1)& 0xFF
+                #cv2.imshow("Mouse Tracking", frame)
+                #key = cv2.waitKey(1)& 0xFF
                 #gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 #frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
                 #cv2.imwrite("frameData/" + frameName, gray)
