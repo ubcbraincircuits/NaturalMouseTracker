@@ -4,7 +4,10 @@ Tracking file. Copy into the darknet folder for processing.
 
 import numpy as np
 from collections import deque
+import cv2
+
 class MouseTracker:
+    totalAllowedVis = 8
 
     def __init__(self, startCoord, id, frame = '', frameCount = 0, width = 0, height = 0):
         self.currCoord = startCoord
@@ -18,6 +21,9 @@ class MouseTracker:
             self.recordedPositions = [startCoord]
         else:
             self.recordedPositions = []
+        self.visualTracker = None
+        self.visualCount = 0
+        self.canDoVisual = True
         self.validatedIndex = 0
         self.id = id
         self.bundled = False
@@ -34,6 +40,31 @@ class MouseTracker:
         self.recordedPositions.append(coordinate)
         self.positionQueue.append(coordinate)
         self.velocity = ((coordinate[0] - self.positionQueue[0][0]), (coordinate[1] - self.positionQueue[0][1]))
+        if self.visualTracker is not None:
+            self.visualCount += 1
+            if self.visualCount > MouseTracker.totalAllowedVis:
+                self.stopVisualTracking()
+
+    def startVisualTracking(self, frame):
+        self.visualTracker = cv2.TrackerMedianFlow_create()
+        bbox = (self.currCoord[0] - self.currCoord[4]/2,
+            self.currCoord[1] - self.currCoord[5]/2,
+            self.currCoord[4], self.currCoord[5])
+        if not self.visualTracker.init(frame, bbox):
+            self.visualTracker = None
+            return False
+        else:
+            self.visualStartPoint = self.currCoord[3]
+            self.canDoVisual = False
+            return True
+
+    def stopVisualTracking(self, delete=True):
+        self.visualTracker = None
+        self.visualCount = 0
+        if delete:
+            self.trimPositions(self.visualStartPoint)
+        else:
+            self.canDoVisual = True
 
     def validate(self):
         self.validatedIndex = len(self.recordedPositions) - 1
@@ -124,7 +155,7 @@ class MouseTracker:
                 if self.recordedPositions[i][3] == mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
                     x1, y1 = self.recordedPositions[i][0], self.recordedPositions[i][1]
                     x2, y2 = mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][0], mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][1]
-                    if (np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))) >= distance:
+                    if (np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))) <= distance:
                         occlusionPoint = self.recordedPositions[i][3]
                         endLoop = True
                         break
@@ -151,7 +182,7 @@ class MouseTracker:
                 if self.recordedPositions[i][3] == mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
                     x1, y1 = self.recordedPositions[i][0], self.recordedPositions[i][1]
                     x2, y2 = mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][0], mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][1]
-                    if (np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))) >= distance:
+                    if (np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))) <= distance:
                         occlusionPoint = self.recordedPositions[i][3]
                         endLoop = True
                         break

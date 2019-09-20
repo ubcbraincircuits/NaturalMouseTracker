@@ -58,7 +58,7 @@ def cvDrawBoxes(detections, img, mice_together, frameCount):
 netMain = None
 metaMain = None
 altNames = None
-maxSwapDistance = 75
+maxSwapDistance = 100
 minSwapVelocity = 5
 
 
@@ -125,7 +125,6 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
     Partially lost mice can be found again as soon as the detection reappears.
     Officially lost mice need the RFID tags to verify them.
     """
-
     lostTrackers = []
     partialLostTrackers = []
     error = False
@@ -214,6 +213,8 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
                 detection[2][3]
             if mouse.tag() not in updatedTags and detection in detections:
                 updatedTags.append(mouse.tag())
+                if mouse.visualTracker is not None:
+                    mouse.stopVisualTracking(delete=False)
                 mouse.updatePosition([x, y], frameName, frameCount -1, w, h)
                 updatedDetection = list(detection)
                 updatedDetection[0] = mouse.tag()
@@ -233,7 +234,16 @@ def YOLO(trialName, mice, RFID, showVideo, dataPath):
             badDetections += 1
             #  Mice have been lost this frame!
             error = True
-            for tracker in filter(lambda x: x.tag() not in updatedTags and x not in partialLostTrackers, mice):
+            for tracker in filter(lambda x: x.tag() not in updatedTags, mice):
+                if tracker.visualTracker != None:
+                    ok, bbox = tracker.visualTracker.update(frame_resized)
+                    if ok:
+                        tracker.updatePosition([bbox[0] - bbox[2]/2, bbox[1] - bbox[3]/2], frameName, frameCount, bbox[2], bbox[3])
+                    else:
+                        tracker.stopVisualTracking()
+            for tracker in filter(lambda x: x.tag() not in updatedTags and x not in partialLostTrackers and x.visualTracker == None, mice):
+                if tracker.canDoVisual:
+                    tracker.startVisualTracking(frame_resized)
                 partialLostTrackers.append(tracker)
                 nearest = sorted(list(filter(lambda x: x.tag() in updatedTags, mice)), key= lambda l: l.distanceFromPos(tracker.getPosition()))
                 if len(nearest) > 0:
