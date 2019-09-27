@@ -1,5 +1,6 @@
 from smbus import SMBus
 import time
+from shutil import copyfile
 import RPi.GPIO as GPIO
 import decimal
 from random import shuffle
@@ -13,15 +14,6 @@ from RFIDTagReader import TagReader
 import threading
 import cv2
 
-Trash_Data = [0,255,255,255,255,255,255,255,255,255,255,255]
-ProT = [None]*18
-
-##readerMap = [
-##    (103, 170), (177, 160), (274, 145), (390, 140), (475, 138), (542, 145), #1-(1-6) [y-x]
-##    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
-##    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
-##]
-readerMap = [(103,310),(525, 120),(525,310),(103,120)]
 #Hex I2C Addresses of all ProTrinkets
 ProT [0] = 0x11
 ProT [1] = 0x12
@@ -57,43 +49,9 @@ Mapping_Dic = { 0:[0,17]}
 #ProT_arrange = [i for i in range(0,8)]
 #ProT_arrange = [i for i in range(0,12)]
 ProT_arrange = [0]
+readerMap = [(525,120),(103, 310), (525, 310), (103, 120)]
 
 
-"""
-Write a number over the I2C bus.
-Used to get a reading from the tag reader into the
-ProTrinket buffer.
-"""
-def writeNumber (value,address_1):
-    try:
-        #with SMBus(1) as bus:
-        bus = SMBus(1)
-        bus.write_byte_data (address_1,0,value)
-    except IOError as e:
-        print (e)
-    return -1
-
-"""
-Gets the last full tag in the ProTrinket serial buffer.
-Converts this into a readable string.
-"""
-def readNumber(address_1):
-    number1 = []
-    try:
-        #with SMBus(1) as bus:
-        bus = SMBus(1)
-        flag = False
-        for i in range (0, 16):
-            if flag:
-                number1.append(chr(bus.read_byte(address_1)))
-            else:
-                x = bus.read_byte(address_1)
-                if x is 2:
-                    flag = True
-
-    except IOError as e:
-        print (e)
-    return number1,time.time()
 
 """
 Scans all readers based on their position in the map.
@@ -107,24 +65,12 @@ def scan(reader, f, readerNum):
     try:
         Data = reader.readTag()
         if f is not False and Data > 0:
-            frameName = 'tracking_system' + trialName + str(frameCount) + '.png'
+            frameName = 'tracking_system___' + trialName + str(frameCount) + '.png'
             f.write (str(Data)+";"+str(readerMap[readerNum])+";"+frameName+"\n")
     finally:
         return
 
-def readTag(tagID):
-    writeNumber(int(1), ProT[tagID])
-    time.sleep (0.13)
-    [Data,Time] = readNumber (ProT[tagID])
-    number =  ''.join(Data)
-    #The tag is always 10 characters long
-    number = number[0:10]
-    if number == '':
-        return False
-    try:
-        return (int(number, 16), tagID)
-    except Exception as e:
-        return False
+
 
 def record():
     global frameCount
@@ -144,7 +90,6 @@ def record():
     reader3 = TagReader ('/dev/ttyUSB0', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     vs = PiVideoStream(resolution=(640,480), trialName=trialName).start()
     with open (vs.folder + "/RTS_test.txt" , "w") as f:
-
         time.sleep(0.25)
         firstFrame = cv2.imread("ref.jpg")
         firstFrame = cv2.cvtColor(firstFrame, cv2.COLOR_BGR2GRAY)
@@ -166,8 +111,6 @@ def record():
                 #cv2.imshow("Mouse Tracking", frame)
                 #key = cv2.waitKey(1)& 0xFF
                 #gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                #frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
-                #cv2.imwrite("frameData/" + frameName, gray)
                 if not thread0.is_alive():
                     thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
                     thread0.start()
@@ -194,6 +137,7 @@ if __name__=="__main__":
     if args.get("text", None) is not None:
         fileName = args.get('text')
         open(fileName, "w+").close()
+        copyfile('RTS_test.txt','/home/pi/Documents/MouseTrackingSystem/RTS_test.txt')
     trialName = args.get("name")
     frameCount = args.get("count")
     record()
