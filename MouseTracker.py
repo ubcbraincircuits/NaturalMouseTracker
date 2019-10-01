@@ -4,6 +4,7 @@ Tracking file. Copy into the darknet folder for processing.
 
 import numpy as np
 from collections import deque
+from filterpy.kalman import KalmanFilter
 import cv2
 
 class MouseTracker:
@@ -26,7 +27,7 @@ class MouseTracker:
         self.canDoVisual = True
         self.validatedIndex = 0
         self.id = id
-        self.bundled = False
+        self.filter = KalmanFilter
         self.lastFrameCount = 0
         self.velocity = (0,0)
 
@@ -39,6 +40,20 @@ class MouseTracker:
         self.lastFrameCount = frameCount
         self.recordedPositions.append(coordinate)
         self.positionQueue.append(coordinate)
+        """
+        TODO: Kalman Filter.
+        Initial state covariance to be determined - depends on mouse speed and
+        other factors. Should use a constant acceleration model, so state transition function
+        should be [ [1  del_t   1/2 del_t^2 0   0       0]
+                    [0  1       del_t       0   0       0]
+                    [0  0       1           0   0       0]
+                    [0  0       0           1   del_t   1/2 del_t^2]
+                    [0  0       0           0   1       del_t]
+                    [0  0       0           0   0       1] ]
+        More parameters to be included after the fact.
+        Use this to update velocity, which will be used to provide a secondary metric
+        for detection assignment.
+        """
         self.velocity = ((coordinate[0] - self.positionQueue[0][0]), (coordinate[1] - self.positionQueue[0][1]))
         if self.visualTracker is not None:
             self.visualCount += 1
@@ -131,9 +146,6 @@ class MouseTracker:
             union = posArea + selfArea - intersection
             return intersection/union
 
-    def bundled(self):
-        return self.bundled
-
     def tag(self):
         return self.id
 
@@ -148,8 +160,10 @@ class MouseTracker:
             lastCheckedFrameDict.update({mouse.tag(): len(mouse.recordedPositions) -1})
         occlusionPoint = len(self.recordedPositions) -1
         endLoop = False
-        for i in range(len(self.recordedPositions) -1, 1, -1):
+        for i in range(len(self.recordedPositions) -1, -1, -1):
             for mouse in others:
+                print(self.recordedPositions[i])
+                print(mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]])
                 while self.recordedPositions[i][3] > mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
                     lastCheckedFrameDict[mouse.tag()] -= 1
                 if self.recordedPositions[i][3] == mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
@@ -190,24 +204,3 @@ class MouseTracker:
                 break
         return occlusionPoint
         pass
-
-
-
-
-"""
-    We have 5 mice
-    at positions (1,1), (232, 222), (77, 11), (2, 10), (72, 8)
-    thus mouseTrackers: {
-        mouse0: (1,1),
-        mouse1: (232, 222),
-        mouse2: (77, 11),
-        mouse3: (2, 10),
-        mouse4: (72, 8)
-    }
-    now mouse 0 and 3 merge, and 2 and 4 merge.
-    thus we have one bundle at (2, 3), and one bundle at (73, 10)
-    So we count 3 contours, 2 are bundles.
-    We take the bundles first.
-    There are 2 mice near the first bundle, and 4 mice must be in a bundle.
-    Therefore, mouse0 and mouse4 are placed in a bundle.
-"""
