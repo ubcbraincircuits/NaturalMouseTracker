@@ -46,7 +46,7 @@ class MouseTracker:
                 self.stopVisualTracking()
 
     def startVisualTracking(self, frame):
-        self.visualTracker = cv2.TrackerMedianFlow_create()
+        self.visualTracker = cv2.TrackerKCF_create()
         bbox = (self.currCoord[0] - self.currCoord[4]/2,
             self.currCoord[1] - self.currCoord[5]/2,
             self.currCoord[4], self.currCoord[5])
@@ -148,7 +148,7 @@ class MouseTracker:
             lastCheckedFrameDict.update({mouse.tag(): len(mouse.recordedPositions) -1})
         occlusionPoint = len(self.recordedPositions) -1
         endLoop = False
-        for i in range(len(self.recordedPositions)-1, 0):
+        for i in range(len(self.recordedPositions) -1, 1, -1):
             for mouse in others:
                 while self.recordedPositions[i][3] > mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
                     lastCheckedFrameDict[mouse.tag()] -= 1

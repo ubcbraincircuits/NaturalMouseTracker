@@ -18,25 +18,27 @@ def convertBack(x, y, w, h):
 trialName = "base_tracking"
 ap = argparse.ArgumentParser()
 ap.add_argument("-n", "--name", help="Name of the frame folder/text file")
+ap.add_argument("-d", "--drive", help="Path to data")
 args = vars(ap.parse_args())
-dataPath = args.get("name", "_08132019")
+dataPath = args.get("name")
+dataDrive = args.get("drive", "frameData")
 darkFile = open("processed" + dataPath + ".json", "r")
 darkData = json.loads(darkFile.read())
 
-temp = input("Show overall track?")
-if temp[0].lower() == 'y':
-    fig = plt.figure()
-    img = mpimg.imread("frameData" + dataPath + "/tracking_system" + trialName + "1.png")
-    plt.imshow(img)
-    plt.axis((0, 640, 0, 480))
-    for datum in darkData.values():
-        x = list(map(lambda l : int(l[0]*640/608), datum))
-        y = list(map(lambda l : int(l[1]*480/608), datum))
-        plt.plot(x, y)
-    plt.show()
+# temp = input("Show overall track?")
+# if temp[0].lower() == 'y':
+#     fig = plt.figure()
+#     img = mpimg.imread("frameData" + dataPath + "/tracking_system" + trialName + "1.png")
+#     plt.imshow(img)
+#     plt.axis((0, 640, 0, 480))
+#     for datum in darkData.values():
+#         x = list(map(lambda l : int(l[0]*640/608), datum))
+#         y = list(map(lambda l : int(l[1]*480/608), datum))
+#         plt.plot(x, y)
+#     plt.show()
 if True:
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
-    #video = cv2.VideoWriter('output_pairs08132019.avi',fourcc, 15.0, (640, 480))
+    main = cv2.VideoWriter('output_' + dataPath + '.avi',fourcc, 15.0, (640, 480))
     frameCount = 2
     lastFrameDict = {}
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
@@ -55,10 +57,11 @@ if True:
         files.update({tag: open("videos" + dataPath + "/"+ tag + ".txt", "w")})
     while True:
         try:
-            frameName = "frameData"+ dataPath + "/tracking_system" + trialName + str(frameCount) + ".png"
+            frameName = dataDrive + dataPath + "/tracking_system" + trialName + str(frameCount) + ".png"
             frame_read = cv2.imread(frameName)
             frameCount += 1
             frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
+            frame_rgb_c = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
             print(frameCount)
         except Exception as e:
             print(str(e))
@@ -80,20 +83,21 @@ if True:
                     blank_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] = frame_rgb[pt1[1]:pt2[1], pt1[0]:pt2[0]]
                     videos[tag].write(blank_image)
                     files[tag].write(str(frameCount) + "\n")
-                    # cv2.rectangle(frame_rgb, pt1, pt2, (0, 255, 0), 1)
-                    # cv2.putText(frame_rgb,
-                    #             str(tag),
-                    #             (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                    #             [0, 255, 0], 2)
+                    cv2.rectangle(frame_rgb_c, pt1, pt2, (0, 255, 0), 1)
+                    cv2.putText(frame_rgb_c,
+                                str(tag),
+                                (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                [0, 255, 0], 2)
                     break
                 elif datum[lastFrameDict[tag]][3] < frameCount:
                     lastFrameDict[tag] += 1
                 else:
                     break
-        #video.write(frame_rgb)
+        main.write(frame_rgb_c)
     cv2.destroyAllWindows()
     for video in videos.values():
         video.release()
+    main.release()
     for file in files.values():
         file.close()
 
