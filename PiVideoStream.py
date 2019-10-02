@@ -35,6 +35,7 @@ class PiVideoStream:
 				os.mkdir(self.folder+'_'+str(count))
                 self.folder=self.folder+'_'+str(count)
                '''
+		self.camera.start_recording(self.folder + '/tracking_system' + self.trialName + ".h264")
 		self.rawCapture = PiRGBArray(self.camera, size=resolution)
 		self.stream = self.camera.capture_continuous(self.rawCapture,
 			format="bgr", use_video_port=True)
@@ -57,13 +58,18 @@ class PiVideoStream:
 		return self
 
 	def save(self):
-		while True:
-                        frame, frameCount = self.frames.get()
-                        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                        frameName = 'tracking_system' + self.trialName + str(frameCount) + '.png'
-                        cv2.imwrite(self.folder + "/" + frameName, gray)
-                        self.frames.task_done()
-                        
+		vidcap = cv2.VideoCapture(self.folder + '/tracking_system' + self.trialName  + ".h264")
+		success, frame = vidcap.read()
+		frameCount = 0
+		while success:
+#                        frame, frameCount = self.frames.get()
+			gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+			frameName = 'tracking_system' + self.trialName + str(frameCount) + '.png'
+			cv2.imwrite(self.folder + "/" + frameName, gray)
+			success, frame = vidcap.read()
+			frameCount += 1
+#                        self.frames.task_done()
+
 	def update(self):
 		# keep looping infinitely until the thread is stopped
 		for f in self.stream:
@@ -71,7 +77,7 @@ class PiVideoStream:
 			# preparation for the next frame
 			self.frame = f.array
 			self.frameCount += 1
-			self.frames.put((self.frame, self.frameCount))
+			#self.frames.put((self.frame, self.frameCount))
 			self.rawCapture.truncate(0)
 
 			# if the thread indicator variable is set, stop the thread
@@ -89,6 +95,7 @@ class PiVideoStream:
 	def stop(self):
 		# indicate that the thread should be stopped
 		self.stopped = True
-		self.frames.join()
+#		self.save()
+#		self.frames.join()
 		print("done")
 
