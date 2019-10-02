@@ -1,3 +1,4 @@
+
 from smbus import SMBus
 import time
 import RPi.GPIO as GPIO
@@ -11,18 +12,17 @@ from imutils.video import FPS
 import argparse
 from RFIDTagReader import TagReader
 import threading
+from shutil import copyfile
 import cv2
-
-Trash_Data = [0,255,255,255,255,255,255,255,255,255,255,255]
-ProT = [None]*18
 
 ##readerMap = [
 ##    (103, 170), (177, 160), (274, 145), (390, 140), (475, 138), (542, 145), #1-(1-6) [y-x]
 ##    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
 ##    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
 ##]
-readerMap = [(525,310),(525, 120), (103, 310), (103, 120)]
+readerMap = [(103,310),(525, 120), (525, 310), (103, 120)]
 #Hex I2C Addresses of all ProTrinkets
+'''
 ProT [0] = 0x11
 ProT [1] = 0x12
 ProT [2] = 0x13
@@ -36,27 +36,28 @@ ProT [9] = 0x34
 ProT [10] = 0x35
 ProT [11] = 0x36
 ProT [12] = 0x51
-ProT [13] = 0x52
-ProT [14] = 0x53
-ProT [15] = 0x54
-ProT [16] = 0x55
-ProT [17] = 0x56
-ProT_Dic = {ProT[0]:"1-1",ProT[1]:"1-2",ProT[2]:"1-3",ProT[3]:"1-4",
-            ProT[4]:"1-5",ProT[5]:"1-6", ProT[6]:"2-1",ProT[7]:"2-2",
-            ProT[8]:"2-3",ProT[9]:"2-4",ProT[10]:"2-5",ProT[11]:"2-6",
-            ProT[12]:"3-1",ProT[13]:"3-2",ProT[14]:"3-3",ProT[15]:"3-4",
-            ProT[16]:"3-5",ProT[17]:"3-6"}
+'''
+#ProT [13] = 0x52
+#ProT [14] = 0x53
+#ProT [15] = 0x54
+#ProT [16] = 0x55
+#ProT [17] = 0x56
+#ProT_Dic = {ProT[0]:"1-1",ProT[1]:"1-2",ProT[2]:"1-3",ProT[3]:"1-4",
+#            ProT[4]:"1-5",ProT[5]:"1-6", ProT[6]:"2-1",ProT[7]:"2-2",
+#            ProT[8]:"2-3",ProT[9]:"2-4",ProT[10]:"2-5",ProT[11]:"2-6",
+#            ProT[12]:"3-1",ProT[13]:"3-2",ProT[14]:"3-3",ProT[15]:"3-4",
+#            ProT[16]:"3-5",ProT[17]:"3-6"}
 #Adapted from ENPH 479 report by Yuan Tian, Ziyue Hu, and Becky Lin
 # Essentially, only readers at least 4 apart can be turned on simultaneously.
 # From testing, this unfortnuately leaves the middle units without a pair.
 #Mapping_Dic = { 0: [0, 4], 1: [1, 5], 2: [6, 10], 3:[7, 11],
                 #4: [12, 16], 5: [13, 17], 6: [14], 7: [15],
                 #8: [8], 9:[9], 10: [2], 11:[3]}
-Mapping_Dic = { 0:[0,17]}
+#Mapping_Dic = { 0:[0,17]}
 #ProT_arrange = [i for i in range(0,18)]
 #ProT_arrange = [i for i in range(0,8)]
 #ProT_arrange = [i for i in range(0,12)]
-ProT_arrange = [0]
+#ProT_arrange = [0]
 
 
 """
@@ -142,14 +143,10 @@ def record():
     reader1 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader2 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader3 = TagReader ('/dev/ttyUSB0', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    with open ("RTS_test.txt" , "w") as f:
-
+    vs = PiVideoStream(resolution=(640,480), trialName=trialName).start()
+    with open (vs.folder + "/RTS_test.txt" , "w") as f:
         time.sleep(0.25)
-        firstFrame = cv2.imread("ref.jpg")
-        firstFrame = cv2.cvtColor(firstFrame, cv2.COLOR_BGR2GRAY)
         needPulse = False
-        vs = PiVideoStream(resolution=(640,480), trialName=trialName).start()
-        vs.camera.exposure_mode = "off"
         time.sleep(2)
         startTime = time.time()
         thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
@@ -165,9 +162,6 @@ def record():
                 frame, frameCount = vs.read()
                 cv2.imshow("Mouse Tracking", frame)
                 key = cv2.waitKey(1)& 0xFF
-                #gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                #frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
-                #cv2.imwrite("frameData/" + frameName, gray)
                 if not thread0.is_alive():
                     thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
                     thread0.start()
@@ -194,6 +188,7 @@ if __name__=="__main__":
     if args.get("text", None) is not None:
         fileName = args.get('text')
         open(fileName, "w+").close()
+        copyfile('RTS_test.txt','/home/pi/Documents/MouseTrackingSystem/RTS_test.txt')
     trialName = args.get("name")
     frameCount = args.get("count")
     record()
