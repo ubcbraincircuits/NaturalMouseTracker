@@ -1,4 +1,3 @@
-
 from smbus import SMBus
 import time
 import RPi.GPIO as GPIO
@@ -159,9 +158,12 @@ def record():
         thread3.start()
         while True:
             try:
+                time.sleep(0.03)
                 frame, frameCount = vs.read()
-                cv2.imshow("Mouse Tracking", frame)
+                #cv2.imshow("Mouse Tracking", frame)
                 key = cv2.waitKey(1)& 0xFF
+                print("Currently active threads")
+                print(list(threading.enumerate()))
                 if not thread0.is_alive():
                     thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
                     thread0.start()
