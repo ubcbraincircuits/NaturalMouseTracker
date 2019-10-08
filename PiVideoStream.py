@@ -11,13 +11,15 @@ from queue import Queue
 from os import listdir
 import os
 import cv2
+import warnings
 
 class PiVideoStream:
-	def __init__(self, resolution=(640, 480), framerate=32, trialName= "base"):
+	def __init__(self, resolution=(640,480), framerate=15, trialName= "base"):
 		# initialize the camera and stream
 		self.camera = PiCamera()
 		self.trialName = trialName
 		self.camera.resolution = resolution
+		resolution = self.camera.resolution
 		self.camera.exposure_mode = "off"
 		self.camera.framerate = framerate
 		self.folder = "/mnt/frameData/" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
@@ -35,7 +37,7 @@ class PiVideoStream:
 				os.mkdir(self.folder+'_'+str(count))
                 self.folder=self.folder+'_'+str(count)
                '''
-		self.camera.start_recording(self.folder + '/tracking_system' + self.trialName + ".h264")
+		self.camera.start_recording(self.folder + '/tracking_system' + self.trialName + ".h264", quality=1)
 		self.rawCapture = PiRGBArray(self.camera, size=resolution)
 		self.stream = self.camera.capture_continuous(self.rawCapture,
 			format="bgr", use_video_port=True)
@@ -52,9 +54,6 @@ class PiVideoStream:
 		t = Thread(target=self.update, args=())
 		t.daemon = True
 		t.start()
-		self.worker = Thread(target=self.save, args=())
-		self.worker.daemon = True
-		self.worker.start()
 		return self
 
 	def save(self):
@@ -77,9 +76,7 @@ class PiVideoStream:
 			# preparation for the next frame
 			self.frame = f.array
 			self.frameCount += 1
-			#self.frames.put((self.frame, self.frameCount))
 			self.rawCapture.truncate(0)
-
 			# if the thread indicator variable is set, stop the thread
 			# and resource camera resources
 			if self.stopped:
@@ -96,6 +93,5 @@ class PiVideoStream:
 		# indicate that the thread should be stopped
 		self.stopped = True
 #		self.save()
-#		self.frames.join()
 		print("done")
 
