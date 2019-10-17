@@ -5,6 +5,7 @@ Credit to the authors of imutils.
 """
 from picamera.array import PiRGBArray
 import datetime
+from time import sleep
 from picamera import PiCamera
 from threading import Thread
 from queue import Queue
@@ -38,14 +39,14 @@ class PiVideoStream:
                 self.folder=self.folder+'_'+str(count)
                '''
 		self.camera.start_recording(self.folder + '/tracking_system' + self.trialName + ".h264", quality=1)
-		self.rawCapture = PiRGBArray(self.camera, size=resolution)
-		self.stream = self.camera.capture_continuous(self.rawCapture,
-			format="bgr", use_video_port=True)
+#		self.rawCapture = PiRGBArray(self.camera, size=resolution)
+#		self.stream = self.camera.capture_continuous(self.rawCapture,
+#			format="bgr", use_video_port=True)
 
 		# initialize the frame and the variable used to indicate
 		# if the thread should be stopped
 		self.frame = None
-		self.frames = Queue(maxsize = 0)
+#		self.frames = Queue(maxsize = 0)
 		self.frameCount = 0
 		self.stopped = False
 
@@ -54,29 +55,35 @@ class PiVideoStream:
 		t = Thread(target=self.update, args=())
 		t.daemon = True
 		t.start()
+#		self.worker = Thread(target=self.save, args=())
+#		self.worker.daemon = True
+#		self.worker.start()
 		return self
 
 	def save(self):
-		vidcap = cv2.VideoCapture(self.folder + '/tracking_system' + self.trialName  + ".h264")
-		success, frame = vidcap.read()
-		frameCount = 0
-		while success:
-#                        frame, frameCount = self.frames.get()
+		while True:
+			frame, frameCount = self.frames.get()
 			gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 			frameName = 'tracking_system' + self.trialName + str(frameCount) + '.png'
-			cv2.imwrite(self.folder + "/" + frameName, gray)
-			success, frame = vidcap.read()
-			frameCount += 1
-#                        self.frames.task_done()
+			cv2.imwrite(self.folder + "/" + frameName, frame)
+			self.frames.task_done()
 
 	def update(self):
 		# keep looping infinitely until the thread is stopped
+		while True:
+			self.frameCount = self.camera.frame[0]
+			sleep(0.03)
+			if self.stopped:
+				self.camera.stop_recording()
+				return
+		"""
 		for f in self.stream:
 			# grab the frame from the stream and clear the stream in
 			# preparation for the next frame
 			self.frame = f.array
 			self.frameCount += 1
 			self.rawCapture.truncate(0)
+			self.frames.put((self.frame, self.frameCount))
 			# if the thread indicator variable is set, stop the thread
 			# and resource camera resources
 			if self.stopped:
@@ -84,6 +91,7 @@ class PiVideoStream:
 				self.rawCapture.close()
 				self.camera.close()
 				return
+		"""
 
 	def read(self):
 		# return the frame (number) most recently read
@@ -92,6 +100,7 @@ class PiVideoStream:
 	def stop(self):
 		# indicate that the thread should be stopped
 		self.stopped = True
-#		self.save()
+		self.camera.close()
+#		self.frames.join()
 		print("done")
 

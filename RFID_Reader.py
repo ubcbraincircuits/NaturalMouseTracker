@@ -142,7 +142,7 @@ def record():
     reader1 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader2 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader3 = TagReader ('/dev/ttyUSB0', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    vs = PiVideoStream(resolution=(1640,1232), trialName=trialName).start()
+    vs = PiVideoStream(resolution=(912,720), trialName=trialName).start()
     with open (vs.folder + "/RTS_test.txt" , "w") as f:
         time.sleep(0.25)
         needPulse = False
@@ -160,8 +160,10 @@ def record():
             try:
                 time.sleep(0.03)
                 frame, frameCount = vs.read()
-                #cv2.imshow("Mouse Tracking", frame)
-                key = cv2.waitKey(1)& 0xFF
+                print(frameCount)
+                vs.camera.start_preview()
+#                cv2.imshow("Mouse Tracking", frame)
+#               key = cv2.waitKey(1)& 0xFF
                 if not thread0.is_alive():
                     thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
                     thread0.start()
