@@ -160,9 +160,7 @@ def record():
             try:
                 time.sleep(0.03)
                 frame, frameCount = vs.read()
-                print(frameCount)
-                vs.camera.start_preview()
-#                cv2.imshow("Mouse Tracking", frame)
+#               cv2.imshow("Mouse Tracking", frame)
 #               key = cv2.waitKey(1)& 0xFF
                 if not thread0.is_alive():
                     thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
