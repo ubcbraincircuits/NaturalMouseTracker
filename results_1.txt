@@ -1,0 +1,10 @@
+thresh: 0.4
+minIOU: 0.2
+deletionRadius: 100
+RFIDRadius: 50      
+2018121270 93.78410877809638% Covered
+2018121273 94.0431042456757% Covered                                                                                    
+2018121376 90.16742207011377% Covered                                                                                   
+801010340 88.57644991212655% Covered                                                                                    
+['identity_swap:1', 'dummy_swap:10', 'lost_mouse:297', 'visual:86']
+  

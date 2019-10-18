@@ -1,0 +1,10 @@
+thresh: 0.5
+minIOU: 0.2
+deletionRadius: 100
+RFIDRadius: 50                                                                                                       
+2018121270 90.45416705207658% Covered                                                                                   
+2018121273 89.85292757376746% Covered                                                                                   
+2018121376 91.29590232170936% Covered                                                                                   
+801010340 82.95254833040421% Covered                                                                                    
+['identity_swap:8', 'dummy_swap:2', 'lost_mouse:358', 'visual:153']                                                    
+ frames without all mice:  1173 10.85006012394783 % error 

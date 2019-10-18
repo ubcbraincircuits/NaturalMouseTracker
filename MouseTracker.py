@@ -43,14 +43,34 @@ class MouseTracker:
         """
         TODO: Kalman Filter.
         Initial state covariance to be determined - depends on mouse speed and
-        other factors. Should use a constant acceleration model, so state transition function
-        should be [ [1  del_t   1/2 del_t^2 0   0       0]
+        other factors.
+        From mouse movement data, state covariance matrix P:
+        x      [[350000 0       0       0       0       0       ]
+        x_dot   [0      7000    0       0       0       0       ]
+        x_ddot  [0      0       2700000 0       0       0       ]
+        y       [0      0       0       350000  0       0       ]
+        y_dot   [0      0       0       0       16470   0       ]
+        y_ddot  [0      0       0       0       0       2000000 ]]
+
+        Should use a constant acceleration model, so state transition function
+        should be F = [ [1  del_t   1/2 del_t^2 0   0       0]
                     [0  1       del_t       0   0       0]
                     [0  0       1           0   0       0]
                     [0  0       0           1   del_t   1/2 del_t^2]
                     [0  0       0           0   1       del_t]
                     [0  0       0           0   0       1] ]
-        More parameters to be included after the fact.
+
+        Process Noise - use general white noise, call variance q
+        q = 5000
+
+        Measurement function - we only measure position, so it is simply
+        H = [[1 0 0 0 0 0]
+             [0 0 0 1 0 0]]
+        Measurement noise matrix:
+        Variances determined by experimental data:
+        R = [[330 52  ]
+             [52   231]]
+
         Use this to update velocity, which will be used to provide a secondary metric
         for detection assignment.
         """
@@ -162,10 +182,11 @@ class MouseTracker:
         endLoop = False
         for i in range(len(self.recordedPositions) -1, -1, -1):
             for mouse in others:
-                print(self.recordedPositions[i])
-                print(mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]])
-                while self.recordedPositions[i][3] > mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
-                    lastCheckedFrameDict[mouse.tag()] -= 1
+                while self.recordedPositions[i][3] < mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
+                    if lastCheckedFrameDict[mouse.tag()] > 0:
+                        lastCheckedFrameDict[mouse.tag()] -= 1
+                    else:
+                        break
                 if self.recordedPositions[i][3] == mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
                     x1, y1 = self.recordedPositions[i][0], self.recordedPositions[i][1]
                     x2, y2 = mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][0], mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][1]
@@ -192,7 +213,10 @@ class MouseTracker:
         for i in range(self.validatedIndex, len(self.recordedPositions)):
             for mouse in others:
                 while self.recordedPositions[i][3] > mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
-                    lastCheckedFrameDict[mouse.tag()] -= 1
+                    if lastCheckedFrameDict[mouse.tag()] < len(mouse.recordedPositions) -1:
+                        lastCheckedFrameDict[mouse.tag()] += 1
+                    else:
+                        break
                 if self.recordedPositions[i][3] == mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
                     x1, y1 = self.recordedPositions[i][0], self.recordedPositions[i][1]
                     x2, y2 = mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][0], mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][1]
