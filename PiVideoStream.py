@@ -100,6 +100,8 @@ class PiVideoStream:
 	def stop(self):
 		# indicate that the thread should be stopped
 		self.stopped = True
+		sleep(1)
+#		self.camera.stop_recording()
 		self.camera.close()
 #		self.frames.join()
 		print("done")
