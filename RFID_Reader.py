@@ -1,7 +1,9 @@
 from smbus import SMBus
+import os
 import time
+import subprocess
 import RPi.GPIO as GPIO
-import decimal
+import datetime
 from random import shuffle
 from picamera import PiCamera
 from picamera.array import PiRGBArray
@@ -102,13 +104,13 @@ If any mice detected, save their tag and position with the frame number.
 frameCount = 0
 
 def scan(reader, f, readerNum):
-    global frameCount
+    global frameCount, startTime
     mice = []
     try:
         Data = reader.readTag()
         if f is not False and Data > 0:
-            frameName = 'tracking_system' + trialName + str(frameCount) + '.png'
-            f.write (str(Data)+";"+str(readerMap[readerNum])+";"+frameName+"\n")
+#            frameName = 'tracking_system' + trialName + str(frameCount) + '.png'
+            f.write (str(Data)+";"+str(readerMap[readerNum])+";"+str(time.time() - startTime)+"\n")
     finally:
         return
 
@@ -142,11 +144,14 @@ def record():
     reader1 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader2 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader3 = TagReader ('/dev/ttyUSB0', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    vs = PiVideoStream(resolution=(912,720), trialName=trialName).start()
-    with open (vs.folder + "/RTS_test.txt" , "w") as f:
-        time.sleep(0.25)
-        needPulse = False
-        time.sleep(2)
+ #   vs = PiVideoStream(resolution=(912,720), trialName=trialName).start()
+    folder = "/mnt/frameData/" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+    video = folder + "/tracking_system" + trialName + ".h264"
+    os.mkdir(folder)
+    os.system("sudo raspivid -t 0 -o " + video + " -pts ~/tmp.txt &")
+    print('camera')
+    time.sleep(2)
+    with open ("/RTS_temp.txt" , "w") as f:
         startTime = time.time()
         thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
         thread1 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 1))
@@ -159,7 +164,6 @@ def record():
         while True:
             try:
                 time.sleep(0.03)
-                frame, frameCount = vs.read()
 #               cv2.imshow("Mouse Tracking", frame)
 #               key = cv2.waitKey(1)& 0xFF
                 if not thread0.is_alive():
@@ -175,9 +179,31 @@ def record():
                     thread3 = threading.Thread(target=scan, daemon= True, args=(reader3, f, 3))
                     thread3.start()
             except KeyboardInterrupt:
+               endTime = time.time()
+	       os.system("sudo kill $(pgrep raspivid)")
                break
         cv2.destroyAllWindows()
-        vs.stop()
+#        vs.stop()
+    duration = endTime - startTime
+    lastFrameTime = float(subprocess.check_output(['tail', '-1', "/home/pi/tmp.txt"])[0:-1])
+    offset = duration - lastFrameTime
+    with open("RTS_temp.txt", "r") as inFile, open (folder + "/RTS_test.txt" , "w") as outFile, open("/home/pi/tmp.txt", 'r') as times:
+        inLines = inFile.readLines()
+        frameIndex = 0
+        times.readline() #first line has no data
+        line = times.readline()
+        for inline in inFile:
+             inline = inline.split(";")
+             time = float(inline[2])
+             actualTime = time - offset
+             bestDelta = abs(actualTime - float(line))
+             while line:
+                 line = times.readline()
+                 if bestDelta > abs(actualTime - float(line)):
+                     bestDelta = abs(actualTime - float(line))
+                 else:
+                     outFile.write(inline[0] + ";" + inline[1] + ";" + 'tracking_system' + trialName + str(frameIndex) + '.png')
+                 frameIndex += 1
 
 if __name__=="__main__":
     ap = argparse.ArgumentParser()
