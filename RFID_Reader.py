@@ -151,7 +151,7 @@ def record():
     os.system("sudo raspivid -t 0 -o " + video + " -pts ~/tmp.txt &")
     print('camera')
     time.sleep(2)
-    with open ("/RTS_temp.txt" , "w") as f:
+    with open ("RTS_temp.txt" , "w") as f:
         startTime = time.time()
         thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
         thread1 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 1))
@@ -180,7 +180,7 @@ def record():
                     thread3.start()
             except KeyboardInterrupt:
                endTime = time.time()
-	       os.system("sudo kill $(pgrep raspivid)")
+               os.system("sudo kill $(pgrep raspivid)")
                break
         cv2.destroyAllWindows()
 #        vs.stop()
@@ -188,14 +188,14 @@ def record():
     lastFrameTime = float(subprocess.check_output(['tail', '-1', "/home/pi/tmp.txt"])[0:-1])
     offset = duration - lastFrameTime
     with open("RTS_temp.txt", "r") as inFile, open (folder + "/RTS_test.txt" , "w") as outFile, open("/home/pi/tmp.txt", 'r') as times:
-        inLines = inFile.readLines()
+        inLines = inFile.readlines()
         frameIndex = 0
         times.readline() #first line has no data
         line = times.readline()
         for inline in inFile:
              inline = inline.split(";")
-             time = float(inline[2])
-             actualTime = time - offset
+             intime = float(inline[2])
+             actualTime = intime - offset
              bestDelta = abs(actualTime - float(line))
              while line:
                  line = times.readline()

@@ -23,6 +23,8 @@ class PiVideoStream:
 		resolution = self.camera.resolution
 		self.camera.exposure_mode = "off"
 		self.camera.framerate = framerate
+		self.lastTime = 0.0
+		self.frameCount = 0
 		self.folder = "/mnt/frameData/" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
 		os.mkdir(self.folder)
 		'''
@@ -47,7 +49,6 @@ class PiVideoStream:
 		# if the thread should be stopped
 		self.frame = None
 #		self.frames = Queue(maxsize = 0)
-		self.frameCount = 0
 		self.stopped = False
 
 	def start(self):
@@ -71,8 +72,10 @@ class PiVideoStream:
 	def update(self):
 		# keep looping infinitely until the thread is stopped
 		while True:
-			self.frameCount = self.camera.frame[0]
-			sleep(0.03)
+			if self.camera.timestamp > self.lastTime:
+				self.frameCount += 1
+				self.lastTime = self.camera.timestamp
+			sleep(0.02)
 			if self.stopped:
 				self.camera.stop_recording()
 				return
