@@ -81,7 +81,7 @@ class MouseTracker:
                 self.stopVisualTracking()
 
     def startVisualTracking(self, frame):
-        self.visualTracker = cv2.TrackerKCF_create()
+        self.visualTracker = cv2.TrackerMedianFlow_create()
         bbox = (self.currCoord[0] - self.currCoord[4]/2,
             self.currCoord[1] - self.currCoord[5]/2,
             self.currCoord[4], self.currCoord[5])
@@ -115,17 +115,21 @@ class MouseTracker:
         self.recordedPositions.extend(newPositions)
         self.recordedPositions = sorted(self.recordedPositions, key = lambda x: x[3])
         self.validatedIndex = len(self.recordedPositions) - 1
-        self.currCoord = self.recordedPositions[self.validatedIndex]
+        if self.validatedIndex >= 0:
+           self.currCoord = self.recordedPositions[self.validatedIndex]
 
     def trimPositions(self, frameCount = 0):
         for rec in self.recordedPositions:
             if rec[3] >= frameCount:
                 index = self.recordedPositions.index(rec)
+                break
         if index > self.validatedIndex:
             self.validatedIndex = index
         tempPositions = self.recordedPositions[self.validatedIndex + 1:]
         self.recordedPositions = self.recordedPositions[:self.validatedIndex+1]
-        print(self.id, "Trimmed to", self.validatedIndex, self.lastValidatedPosition())
+        if self.validatedIndex >= 0:
+           self.currCoord = self.recordedPositions[self.validatedIndex]
+       # print(self.id, "Trimmed to", self.validatedIndex, self.lastValidatedPosition())
         return tempPositions
 
     def getPosition(self):
@@ -188,14 +192,17 @@ class MouseTracker:
                     else:
                         break
                 if self.recordedPositions[i][3] == mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
+                    print(self.recordedPositions[i][3])
                     x1, y1 = self.recordedPositions[i][0], self.recordedPositions[i][1]
                     x2, y2 = mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][0], mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][1]
                     if (np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))) <= distance:
+                        print("near to other")
                         occlusionPoint = self.recordedPositions[i][3]
                         endLoop = True
                         break
             if endLoop:
                 break
+        occlusionPoint = self.validatedIndex
         return occlusionPoint
 
     def occlusionPointAfter(self, others, distance):

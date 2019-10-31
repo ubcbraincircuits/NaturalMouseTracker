@@ -93,11 +93,11 @@ if temp[0].lower() == 'y':
         ax2.plot(frames, vel_y)
         break
     plt.show()
-fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
-main = cv2.VideoWriter('output_filtered_' + dataPath + '.avi',fourcc, 15.0, (640, 480))
+fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # 'x264' doesn't work
+main = cv2.VideoWriter('output_filtered_' + dataPath + '.avi',fourcc, 15.0, (912, 720))
 frameCount = 2
 lastFrameDict = {}
-fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
+# 'x264' doesn't work2018121290,2018121255,801010273,2018121360
 videos = {}
 files = {}
 filters = {}
@@ -111,7 +111,7 @@ finally:
 for tag, datum in darkData.items():
     if len(datum) < 1:
         break
-    videos.update({tag: cv2.VideoWriter("videos" + dataPath + "/" + tag + ".avi" ,fourcc, 15.0, (640, 480))})
+    videos.update({tag: cv2.VideoWriter("videos" + dataPath + "/" + tag + ".avi" ,fourcc, 15.0, (912, 720))})
     lastFrameDict.update({tag: 0})
     files.update({tag: open("videos" + dataPath + "/"+ tag + ".txt", "w")})
     del_t = 0.1
@@ -150,7 +150,7 @@ if not frames:
     cap = cv2.VideoCapture(dataDrive + dataPath + "/tracking_system" + trialName + ".h264")
 while True:
     try:
-        frameName = dataDrive + dataPath + "/tracking_system" + trialName + str(frameCount) + ".png"
+        frameName = dataDrive + dataPath + "/tracking_system" + trialName + str(frameCount) + ".jpg"
         if frames:
             frame_read = cv2.imread(frameName)
         else:
@@ -158,11 +158,13 @@ while True:
             if not success:
                 break
         frameCount += 1
-        frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
-        frame_rgb_c = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
+        frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2GRAY)
+        frame_rgb_c = cv2.cvtColor(frame_read, cv2.COLOR_BGR2GRAY)
+        frame_rgb = cv2.cvtColor(frame_rgb, cv2.COLOR_GRAY2RGB)
+        frame_rgb_c = cv2.cvtColor(frame_rgb_c, cv2.COLOR_GRAY2RGB)
         print(frameCount)
     except Exception as e:
-        print(str(e))
+        print(str(e), 'er')
         break
     for (tag, datum) in darkData.items():
         if len(datum) < 1:
@@ -172,23 +174,24 @@ while True:
             if len(datum) <= lastFrameDict[tag]:
                 break
             if datum[lastFrameDict[tag]][3] == frameCount:
-                w, h = datum[lastFrameDict[tag]][4]*640/608,\
-                    datum[lastFrameDict[tag]][5]*480/608
+                w, h = datum[lastFrameDict[tag]][4]*912/640,\
+                    datum[lastFrameDict[tag]][5]*720/640
                 z = np.array([[datum[lastFrameDict[tag]][0]], [datum[lastFrameDict[tag]][1]]])
                 filters[tag].predict()
                 filters[tag].update(z)
-                x, vel_x, y, vel_y = filters[tag].x[0]*640/608, filters[tag].x[1]*640/608, filters[tag].x[3]*480/608, filters[tag].x[4]*480/608
+                #x, vel_x, y, vel_y = filters[tag].x[0]*640/640, filters[tag].x[1]*640/640, filters[tag].x[3]*480/640, filters[tag].x[4]*480/640
+                x, y = z[0]*912/640, z[1]*720/640
                 xmin, ymin, xmax, ymax = convertBack(
                     float(x), float(y), float(w), float(h))
                 pt1 = (xmin, ymin)
                 pt2 = (xmax, ymax)
-                blank_image = np.ones((480,640,3), np.uint8)*255
+                blank_image = np.ones((720,912,3), np.uint8)*255
                 blank_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] = frame_rgb[pt1[1]:pt2[1], pt1[0]:pt2[0]]
                 videos[tag].write(blank_image)
                 files[tag].write(str(frameCount) + "\n")
                 cv2.rectangle(frame_rgb_c, pt1, pt2, (0, 255, 0), 1)
                 cv2.circle(frame_rgb_c, (int(x), int(y)), 5,  [0, 255, 0])
-                cv2.arrowedLine(frame_rgb_c, (int(x - vel_x), int(y - vel_y)), (int(x + vel_x), int(y + vel_y)), [0, 0, 255])
+                #cv2.arrowedLine(frame_rgb_c, (int(x - vel_x), int(y - vel_y)), (int(x + vel_x), int(y + vel_y)), [0, 0, 255])
                 cv2.putText(frame_rgb_c,
                             str(tag),
                             (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
