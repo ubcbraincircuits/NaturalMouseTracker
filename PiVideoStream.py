@@ -7,13 +7,14 @@ from picamera.array import PiRGBArray
 import datetime
 from time import sleep, time
 from picamera import PiCamera
+import signal
 from multiprocessing import Process
 from multiprocessing import JoinableQueue
 from threading import Thread
 from os import listdir
 import numpy as np
 import os
-import tables
+#import tables
 import cv2
 import warnings
 
@@ -67,23 +68,26 @@ class PiVideoStream:
 		self.worker1 = Process(target=self.save, args=())
 		self.worker1.daemon = True
 		self.worker1.start()
+		self.worker2 = Process(target=self.save, args=())
+		self.worker2.daemon = True
+		self.worker2.start()
 		print("started")
 		return self
 
 	def save(self):
+		#Ignore keyboard interrupt, we want this to continue until done
+		signal.signal(signal.SIGINT, signal.SIG_IGN)
 		while True:
-			try:
-				frame, frameCount = self.frames.get()
-				#gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-				frameName = 'tracking_system' + self.trialName + str(frameCount) + '.jpg'
-				cv2.imwrite(self.folder + "/" + frameName, frame)
+			frame, frameCount = self.frames.get()
+			#gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+			frameName = 'tracking_system' + self.trialName + str(frameCount) + '.jpg'
+			cv2.imwrite(self.folder + "/" + frameName, frame)
+			if frameCount % 100 == 0:
 				print("save", frameCount)
-				del frame
-				if frameCount % 1000 == 0:
-					os.system("echo 1 > /proc/sys/vm/drop_caches")
-				self.frames.task_done()
-			except KeyboardInterrupt:
-				pass
+			del frame
+			if frameCount % 1000 == 0:
+				os.system("echo 1 > /proc/sys/vm/drop_caches")
+			self.frames.task_done()
 
 	def update(self):
 		# keep looping infinitely until the thread is stopped
@@ -103,7 +107,8 @@ class PiVideoStream:
 			start = time()
 			self.frame = f.array
 			self.frameCount += 1
-			print(self.frameCount)
+			if self.frameCount % 100 ==0:
+				print(self.frameCount)
 			self.rawCapture.truncate(0)
 			self.frames.put((self.frame, self.frameCount))
 			self.frame = None

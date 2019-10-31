@@ -9,8 +9,8 @@ from random import shuffle
 from picamera import PiCamera
 from picamera.array import PiRGBArray
 from PiVideoStream import PiVideoStream
-import imutils
-from imutils.video import FPS
+#import imutils
+#from imutils.video import FPS
 import argparse
 from RFIDTagReader import TagReader
 import threading
