@@ -5,17 +5,20 @@ Credit to the authors of imutils.
 """
 from picamera.array import PiRGBArray
 import datetime
-from time import sleep
+from time import sleep, time
 from picamera import PiCamera
+from multiprocessing import Process
+from multiprocessing import JoinableQueue
 from threading import Thread
-from queue import Queue
 from os import listdir
+import numpy as np
 import os
+import tables
 import cv2
 import warnings
 
 class PiVideoStream:
-	def __init__(self, resolution=(640,480), framerate=15, trialName= "base"):
+	def __init__(self, resolution=(912,720), framerate=15, trialName= "base"):
 		# initialize the camera and stream
 		self.camera = PiCamera()
 		self.trialName = trialName
@@ -25,7 +28,8 @@ class PiVideoStream:
 		self.camera.framerate = framerate
 		self.lastTime = 0.0
 		self.frameCount = 0
-		self.folder = "/mnt/frameData/" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+		self.time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+		self.folder = "/mnt/frameData/" + self.time
 		os.mkdir(self.folder)
 		'''
 		except:
@@ -40,15 +44,16 @@ class PiVideoStream:
 				os.mkdir(self.folder+'_'+str(count))
                 self.folder=self.folder+'_'+str(count)
                '''
-		self.camera.start_recording(self.folder + '/tracking_system' + self.trialName + ".h264", quality=1)
-#		self.rawCapture = PiRGBArray(self.camera, size=resolution)
-#		self.stream = self.camera.capture_continuous(self.rawCapture,
-#			format="bgr", use_video_port=True)
-
+#		self.camera.start_recording(self.folder + '/tracking_system' + self.trialName + ".h264", quality=1)
+		self.rawCapture = PiRGBArray(self.camera, size=resolution)
+		self.stream = self.camera.capture_continuous(self.rawCapture,
+			format="bgr", use_video_port=True)
+#		self.hdf5 = None
+#		self.frameStore = None
 		# initialize the frame and the variable used to indicate
 		# if the thread should be stopped
 		self.frame = None
-#		self.frames = Queue(maxsize = 0)
+		self.frames = JoinableQueue(maxsize = 0)
 		self.stopped = False
 
 	def start(self):
@@ -56,21 +61,33 @@ class PiVideoStream:
 		t = Thread(target=self.update, args=())
 		t.daemon = True
 		t.start()
-#		self.worker = Thread(target=self.save, args=())
-#		self.worker.daemon = True
-#		self.worker.start()
+		self.worker = Process(target=self.save, args=())
+		self.worker.daemon = True
+		self.worker.start()
+		self.worker1 = Process(target=self.save, args=())
+		self.worker1.daemon = True
+		self.worker1.start()
+		print("started")
 		return self
 
 	def save(self):
 		while True:
-			frame, frameCount = self.frames.get()
-			gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-			frameName = 'tracking_system' + self.trialName + str(frameCount) + '.png'
-			cv2.imwrite(self.folder + "/" + frameName, frame)
-			self.frames.task_done()
+			try:
+				frame, frameCount = self.frames.get()
+				#gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+				frameName = 'tracking_system' + self.trialName + str(frameCount) + '.jpg'
+				cv2.imwrite(self.folder + "/" + frameName, frame)
+				print("save", frameCount)
+				del frame
+				if frameCount % 1000 == 0:
+					os.system("echo 1 > /proc/sys/vm/drop_caches")
+				self.frames.task_done()
+			except KeyboardInterrupt:
+				pass
 
 	def update(self):
 		# keep looping infinitely until the thread is stopped
+		"""
 		while True:
 			if self.camera.timestamp > self.lastTime:
 				self.frameCount += 1
@@ -83,29 +100,40 @@ class PiVideoStream:
 		for f in self.stream:
 			# grab the frame from the stream and clear the stream in
 			# preparation for the next frame
+			start = time()
 			self.frame = f.array
 			self.frameCount += 1
+			print(self.frameCount)
 			self.rawCapture.truncate(0)
 			self.frames.put((self.frame, self.frameCount))
+			self.frame = None
+#			if self.hdf5 is None:
+#				self.hdf5 = tables.open_file(self.folder + "/video.hdf5", mode="w")
+#				self.frameStore = self.hdf5.create_earray(self.hdf5.root, 'raw_images',
+#					tables.Atom.from_dtype(self.frame.dtype),
+#					shape = (0, self.camera.resolution[1], self.camera.resolution[0], 3))
+#				print("hdf5 init")
 			# if the thread indicator variable is set, stop the thread
 			# and resource camera resources
+			sleep(max(0.5/(self.camera.framerate) - time(), 0))
 			if self.stopped:
 				self.stream.close()
 				self.rawCapture.close()
 				self.camera.close()
 				return
-		"""
 
 	def read(self):
 		# return the frame (number) most recently read
-		return (self.frame, self.frameCount)
+		return self.frameCount
 
 	def stop(self):
 		# indicate that the thread should be stopped
 		self.stopped = True
 		sleep(1)
 #		self.camera.stop_recording()
-		self.camera.close()
-#		self.frames.join()
+#		self.camera.close()
+		self.frames.join()
+#		self.hdf5.close()
+#		os.system("sudo mv " + self.folder + "/mnt/frameData/" + self.time)
 		print("done")
 

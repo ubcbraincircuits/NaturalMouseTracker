@@ -1,3 +1,4 @@
+
 from smbus import SMBus
 import os
 import time
@@ -21,7 +22,7 @@ import cv2
 ##    (105, 253), (183, 250), (278, 248), (393, 237), (487, 235), (550, 230), #2-(1-6) [y-x]
 ##    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
 ##]
-readerMap = [(103,310),(525, 120), (525, 310), (103, 120)]
+readerMap = [(103,120),(525, 120), (103, 350), (525, 350)]
 #Hex I2C Addresses of all ProTrinkets
 '''
 ProT [0] = 0x11
@@ -109,8 +110,12 @@ def scan(reader, f, readerNum):
     try:
         Data = reader.readTag()
         if f is not False and Data > 0:
-#            frameName = 'tracking_system' + trialName + str(frameCount) + '.png'
-            f.write (str(Data)+";"+str(readerMap[readerNum])+";"+str(time.time() - startTime)+"\n")
+            frameName = 'tracking_system' + trialName + str(frameCount) + '.png'
+            print("pickup")
+            try:
+                f.write (str(Data)+";"+str(readerMap[readerNum])+";"+frameName+"\n")
+            except Exception as e:
+                print(str(e))
     finally:
         return
 
@@ -129,7 +134,7 @@ def readTag(tagID):
         return False
 
 def record():
-    global frameCount
+    global frameCount, startTime
     RFID_serialPort = '/dev/ttyUSB0'
     #RFID_serialPort = '/dev/serial0'
     #RFID_serialPort='/dev/cu.usbserial-AL00ES9A'
@@ -140,18 +145,20 @@ def record():
     """
     RFID_timeout = 0.015
     RFID_doCheckSum = True
-    reader0 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    reader1 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    reader2 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-    reader3 = TagReader ('/dev/ttyUSB0', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
- #   vs = PiVideoStream(resolution=(912,720), trialName=trialName).start()
+    reader0 = TagReader ('/dev/ttyUSB0', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader1 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader2 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    reader3 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
+    vs = PiVideoStream(trialName=trialName).start()
     folder = "/mnt/frameData/" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
     video = folder + "/tracking_system" + trialName + ".h264"
-    os.mkdir(folder)
-    os.system("sudo raspivid -t 0 -o " + video + " -pts ~/tmp.txt &")
+   # os.mkdir(folder)
+   # os.system("sudo rm /home/pi/tmp.txt")
+   # os.system("sudo touch /home/pi/tmp.txt")
+   # os.system("sudo raspivid -t 0 -w 912 -h 720 -fps 15 -ex off -o " + video + " -pts /home/pi/tmp.txt &")
     print('camera')
     time.sleep(2)
-    with open ("RTS_temp.txt" , "w") as f:
+    with open (vs.folder + "/RTS_test.txt" , "w") as f:
         startTime = time.time()
         thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
         thread1 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 1))
@@ -164,6 +171,7 @@ def record():
         while True:
             try:
                 time.sleep(0.03)
+                frameCount = vs.read()
 #               cv2.imshow("Mouse Tracking", frame)
 #               key = cv2.waitKey(1)& 0xFF
                 if not thread0.is_alive():
@@ -180,31 +188,38 @@ def record():
                     thread3.start()
             except KeyboardInterrupt:
                endTime = time.time()
-               os.system("sudo kill $(pgrep raspivid)")
+              # os.system("sudo kill -s 2 $(pgrep raspivid)")
                break
         cv2.destroyAllWindows()
-#        vs.stop()
+        vs.stop()
+    """
     duration = endTime - startTime
     lastFrameTime = float(subprocess.check_output(['tail', '-1', "/home/pi/tmp.txt"])[0:-1])
-    offset = duration - lastFrameTime
+    offset = duration*1000 - lastFrameTime
+    print(offset)
     with open("RTS_temp.txt", "r") as inFile, open (folder + "/RTS_test.txt" , "w") as outFile, open("/home/pi/tmp.txt", 'r') as times:
         inLines = inFile.readlines()
+        print(inLines, "RTS")
         frameIndex = 0
         times.readline() #first line has no data
         line = times.readline()
-        for inline in inFile:
+        for inline in inLines:
              inline = inline.split(";")
-             intime = float(inline[2])
+             intime = float(inline[2])*1000
              actualTime = intime - offset
              bestDelta = abs(actualTime - float(line))
              while line:
                  line = times.readline()
+                 if len(line) < 2:
+                     break
                  if bestDelta > abs(actualTime - float(line)):
                      bestDelta = abs(actualTime - float(line))
                  else:
-                     outFile.write(inline[0] + ";" + inline[1] + ";" + 'tracking_system' + trialName + str(frameIndex) + '.png')
+                     print(bestDelta, inline, line, actualTime)
+                     outFile.write(inline[0] + ";" + inline[1] + ";" + 'tracking_system' + trialName + str(frameIndex) + '.png\n')
+                     break
                  frameIndex += 1
-
+    """
 if __name__=="__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("-t", "--text", help="path to the text file")
