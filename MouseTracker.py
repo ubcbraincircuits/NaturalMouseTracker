@@ -9,6 +9,7 @@ import cv2
 
 class MouseTracker:
     totalAllowedVis = 8
+    kVelocityDiff = 0.01
 
     def __init__(self, startCoord, id, frame = '', frameCount = 0, width = 0, height = 0):
         self.currCoord = startCoord
@@ -18,13 +19,13 @@ class MouseTracker:
             startCoord.append(frameCount)
             startCoord.append(width)
             startCoord.append(height)
-            self.positionQueue.append(startCoord)
+            self.lastPos = None
             self.recordedPositions = [startCoord]
         else:
             self.recordedPositions = []
         self.visualTracker = None
         self.visualCount = 0
-        self.canDoVisual = True
+        self.canDoVisual = False
         self.validatedIndex = 0
         self.id = id
         self.filter = KalmanFilter
@@ -37,9 +38,12 @@ class MouseTracker:
         coordinate.append(frameCount)
         coordinate.append(width)
         coordinate.append(height)
+        if (frameCount - self.lastFrameCount) > 5:
+            self.lastPos = None
         self.lastFrameCount = frameCount
         self.recordedPositions.append(coordinate)
-        self.positionQueue.append(coordinate)
+        if len(self.recordedPositions) > 10:
+            self.canDoVisual = True
         """
         TODO: Kalman Filter.
         Initial state covariance to be determined - depends on mouse speed and
@@ -74,14 +78,18 @@ class MouseTracker:
         Use this to update velocity, which will be used to provide a secondary metric
         for detection assignment.
         """
-        self.velocity = ((coordinate[0] - self.positionQueue[0][0]), (coordinate[1] - self.positionQueue[0][1]))
+        if self.lastPos:
+            self.velocity = ((coordinate[0] - self.lastPos[0]), (coordinate[1] - self.lastPos[1]))
+        else:
+            self.velocity = (0,0)
+        self.lastPos = coordinate
         if self.visualTracker is not None:
             self.visualCount += 1
             if self.visualCount > MouseTracker.totalAllowedVis:
                 self.stopVisualTracking()
 
     def startVisualTracking(self, frame):
-        self.visualTracker = cv2.TrackerMedianFlow_create()
+        self.visualTracker = cv2.TrackerCSRT_create()
         bbox = (self.currCoord[0] - self.currCoord[4]/2,
             self.currCoord[1] - self.currCoord[5]/2,
             self.currCoord[4], self.currCoord[5])
@@ -169,6 +177,13 @@ class MouseTracker:
                 intersection = 0
             union = posArea + selfArea - intersection
             return intersection/union
+
+    def trackLikelihood (self, pos):
+        IOU = self.intersectionOverUnion(pos)
+        new_vel = (self.currCoord[0] - pos[0], self.currCoord[1] - pos[1])
+        del_vel = np.sqrt((new_vel[0] - self.velocity[0])**2 +
+                    (new_vel[1] - self.velocity[1])**2)
+        return IOU - MouseTracker.kVelocityDiff*del_vel
 
     def tag(self):
         return self.id

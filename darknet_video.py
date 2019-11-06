@@ -58,12 +58,12 @@ def cvDrawBoxes(detections, img, mice):
         cv2.rectangle(img, pt1, pt2, (0, 255, 0), 1)
         cv2.rectangle(img, (entranceX, entranceY), (640, 640), [0, 120,120])
         cv2.circle(img, (int(x), int(y)), 5, [0, 0, 255])
-        cv2.circle(img, (int(525*640/640), int(350*640/480)), 5, [0, 255, 0])
-        cv2.circle(img, (int(525*640/640), int(120*640/480)), 5, [0, 255, 0])
-        cv2.circle(img, (int(103*640/640), int(120*640/480)), 5, [0, 255, 0])
-        cv2.circle(img, (int(103*640/640), int(350*640/480)), 5, [0, 255, 0])
+        cv2.circle(img, (int(550*640/640), int(350*640/480)), 5, [0, 255, 0])
+        cv2.circle(img, (int(550*640/640), int(100*640/480)), 5, [0, 255, 0])
+        cv2.circle(img, (int(100*640/640), int(100*640/480)), 5, [0, 255, 0])
+        cv2.circle(img, (int(100*640/640), int(350*640/480)), 5, [0, 255, 0])
         cv2.circle(img, (int(x), int(y)), maxSwapDistance, [255, 0, 0])
-        #cv2.arrowedLine(img, (int(x - vx/2), int(y - vy/2)), (int(x + vx/2), int(y + vy/2)), [0, 0, 255])
+        cv2.arrowedLine(img, (int(x - vx/2), int(y - vy/2)), (int(x + vx/2), int(y + vy/2)), [0, 0, 255])
         cv2.putText(img,
                     str(detection[0]) +
                     " [" + str(round(detection[1] * 100, 2)) + "]",
@@ -76,8 +76,8 @@ def cvDrawBoxes(detections, img, mice):
 netMain = None
 metaMain = None
 altNames = None
-entranceX = 500
-entranceY = 300
+entranceX = 550
+entranceY = 350
 maxSwapDistance = 100
 minSwapIOU = 0.2
 
@@ -210,7 +210,7 @@ def YOLO(trialName, mice, RFID, showVideo):
         """
         # pairs = itertools.product(list(filter(lambda x: x.lastFrameCount == frameCount -1, mice)), detections)
         pairs = itertools.product(mice, detections)
-        pairs = sorted(pairs, key=lambda l: l[0].intersectionOverUnion(l[1][2]), reverse = True)
+        pairs = sorted(pairs, key=lambda l: l[0].trackLikelihood(l[1][2]), reverse = True)
         matrix = []
         for i in range(0, len(mice)):
             row = []
@@ -292,10 +292,10 @@ def YOLO(trialName, mice, RFID, showVideo):
                 for nMouse in nearest:
                     if nMouse not in partialLostTrackers:
                         # This checks if there is a mouse nearby to the one that just disappeared.
-                        iou = nMouse.intersectionOverUnion([tracker.getPosition()[0], tracker.getPosition()[1], tracker.getPosition()[4], tracker.getPosition()[5]])
-#                        print(nMouse.tag(), iou)
+                        iou = nMouse.trackLikelihood([tracker.getPosition()[0], tracker.getPosition()[1], tracker.getPosition()[4], tracker.getPosition()[5]])
+                        print(nMouse.tag(), iou)
                         if iou <= minSwapIOU:
-#                            print("no intersection")
+                            print("no intersection")
                             pass
                         else:
                             partialLostTrackers.append(nMouse)
@@ -314,6 +314,8 @@ def YOLO(trialName, mice, RFID, showVideo):
                          print(str(e))
                          # for safety idk
                          pass
+                elif len(tracker.recordedPositions) <= 5 and tracker.tag() < 99999:
+                    mice.remove(tracker)
                 else:
                     partialLostTrackers.append(tracker)
 
@@ -346,6 +348,13 @@ def YOLO(trialName, mice, RFID, showVideo):
                 First iterate through all lost trackers. If the pickup is one of
                 these, we either have an identification or a dummy swap.
                 """
+                for tracker in partialLostTrackers:
+                    if int(ln[0]) == tracker.tag():
+                        #You have just got a pickup for a mouse that has recently disappeared.
+                        #In all likelihood, they are occluded by another, using
+                        #this pickup will do nothing but harm,
+                        #Ignore this pickup.
+                        usedIndex = True
                 for tracker in lostTrackers:
                     if int(ln[0]) == tracker.tag():
                         usedIndex = True

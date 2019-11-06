@@ -17,31 +17,35 @@ likelihood_thresh = 0.5
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-n", "--name", help="Name of the frame folder/text file")
+ap.add_argument("-d", "--drive", help="Path to data")
+ap.add_argument("-f", "--frames", help="Include this argument if you have individual frame files")
 args = vars(ap.parse_args())
+dataPath = args.get("name")
+dataDrive = args.get("drive", "frameData")
 
-#config_path = r'C:\Users\greg2\Desktop\Braeden\DeepLabCut\CropMouseLabel-Braeden-2019-09-11\config.yaml'
-#deeplabcut.analyze_videos(config_path, ["C:\\Users\\greg2\\Desktop\\Braeden\\MouseTrackingSystem\\darknet\\videos" + args.get("name", "")], videotype=".avi", save_as_csv=True)
+config_path = '/home/user/CropMouseLabel-Braeden-2019-09-11/config.yaml'
+#deeplabcut.analyze_videos(config_path, ["/home/user/MouseTrackingSystem/darknet/videos" + dataPath], videotype=".avi", save_as_csv=True)
 
-with open ("darknet\\processed" +  args.get("name", "") + ".json", "r") as darkFile:
+with open ("darknet/processed" +  dataPath + ".json", "r") as darkFile:
     darkData = json.loads(darkFile.read())
-    #lol
-
 
 for tag, datum in darkData.items():
-    for file in os.listdir('darknet\\videos' + args.get("name", "")):
+    for file in os.listdir('darknet/videos' + dataPath):
         if fnmatch.fnmatch(file, tag + '*.csv'):
             json_index = 0
-            with open('darknet\\videos' + args.get("name", "") + "\\" + file) as csvfile:
-                with open('darknet\\videos' + args.get("name", "") + "\\" + tag + ".txt") as tfile:
+            with open('darknet/videos' + dataPath + "/" + file) as csvfile:
+                with open('darknet/videos' + dataPath + "/" + tag + ".txt") as tfile:
                     reader = list(csv.reader(csvfile))
                     frames = tfile.readlines()
                     print(len(frames))
                     print(len(reader))
                     for index in range(3, len(reader)):
+                        print(index)
                         try:
                             row = list(map(float, reader[index]))
                             row[0] = frames[index - 3]
                         except Exception as e:
+                            print(str(e))
                             continue
                         while int(datum[json_index][3]) < int(row[0]):
                             json_index += 1
@@ -50,7 +54,7 @@ for tag, datum in darkData.items():
                         i = 3
                         while i < 13:
                             if(index == 3):
-                                print(i, len(row))
+                                print(i, len(row), row[0])
                                 print(json_index)
                             if row[i] > likelihood_thresh:
                                 datum[json_index].append(row[i-2])
@@ -62,7 +66,7 @@ for tag, datum in darkData.items():
                         json_index += 1
 
 fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
-video = cv2.VideoWriter('output_pairs' + args.get("name", "") + '.avi',fourcc, 15.0, (640, 480))
+video = cv2.VideoWriter('output_pairs' + dataPath + '.avi',fourcc, 15.0, (912, 720))
 frameCount = 2
 lastFrameDict = {}
 fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
@@ -70,9 +74,10 @@ for tag in darkData.keys():
     lastFrameDict.update({tag: 0})
 while True:
     try:
-        frameName = "darknet/frameData"+ args.get("name", "") + "/tracking_systembase_tracking" + str(frameCount) + ".png"
+        frameName = dataDrive + dataPath + "/tracking_systembase_tracking" + str(frameCount) + ".jpg"
         frame_read = cv2.imread(frameName)
         frameCount += 1
+        print(frameCount)
         frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
     except Exception as e:
         print(str(e))
@@ -82,10 +87,10 @@ while True:
             if len(datum) <= lastFrameDict[tag]:
                 break
             if datum[lastFrameDict[tag]][3] == frameCount:
-                x, y, w, h = datum[lastFrameDict[tag]][0]*640/608,\
-                    datum[lastFrameDict[tag]][1]*480/608,\
-                    datum[lastFrameDict[tag]][4]*640/608,\
-                    datum[lastFrameDict[tag]][5]*480/608
+                x, y, w, h = datum[lastFrameDict[tag]][0]*912/640,\
+                    datum[lastFrameDict[tag]][1]*720/640,\
+                    datum[lastFrameDict[tag]][4]*912/640,\
+                    datum[lastFrameDict[tag]][5]*720/640
                 xmin, ymin, xmax, ymax = convertBack(
                     float(x), float(y), float(w), float(h))
                 pt1 = (xmin, ymin)
@@ -122,5 +127,5 @@ while True:
                 break
     video.write(frame_rgb)
 video.release()
-with open("darknet\\processed" + args.get("name", "") + "_ht.json", "w") as outfile:
+with open("darknet/processed" + dataPath + "_ht.json", "w") as outfile:
     json.dump(darkData, outfile, ensure_ascii=False)
