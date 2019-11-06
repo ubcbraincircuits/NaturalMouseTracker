@@ -14,7 +14,7 @@ from threading import Thread
 from os import listdir
 import numpy as np
 import os
-#import tables
+import sys
 import cv2
 import warnings
 
@@ -32,6 +32,7 @@ class PiVideoStream:
 		self.time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
 		self.folder = "/mnt/frameData/" + self.time
 		os.mkdir(self.folder)
+		signal.signal(signal.SIGINT, self.stopHandler)
 		'''
 		except:
 			print('file exists')
@@ -76,7 +77,7 @@ class PiVideoStream:
 
 	def save(self):
 		#Ignore keyboard interrupt, we want this to continue until done
-		signal.signal(signal.SIGINT, signal.SIG_IGN)
+#		signal.signal(signal.SIGINT, signal.SIG_IGN)
 		while True:
 			frame, frameCount = self.frames.get()
 			#gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -85,7 +86,7 @@ class PiVideoStream:
 			if frameCount % 100 == 0:
 				print("save", frameCount)
 			del frame
-			if frameCount % 1000 == 0:
+			if frameCount % 500 == 0:
 				os.system("echo 1 > /proc/sys/vm/drop_caches")
 			self.frames.task_done()
 
@@ -131,6 +132,10 @@ class PiVideoStream:
 		# return the frame (number) most recently read
 		return self.frameCount
 
+	def stopHandler(self, signal, frame):
+		print('interrupt', signal, frame)
+		self.stop()
+
 	def stop(self):
 		# indicate that the thread should be stopped
 		self.stopped = True
@@ -141,4 +146,5 @@ class PiVideoStream:
 #		self.hdf5.close()
 #		os.system("sudo mv " + self.folder + "/mnt/frameData/" + self.time)
 		print("done")
+		sys.exit(0)
 
