@@ -21,6 +21,7 @@ import warnings
 class PiVideoStream:
 	def __init__(self, resolution=(912,720), framerate=15, trialName= "base"):
 		# initialize the camera and stream
+		signal.signal(signal.SIGINT, signal.SIG_IGN) ################### Catch keyboard interrupts and run save function
 		self.camera = PiCamera()
 		self.trialName = trialName
 		self.camera.resolution = resolution
@@ -54,12 +55,11 @@ class PiVideoStream:
 		# initialize the frame and the variable used to indicate
 		# if the thread should be stopped
 		self.frame = None
-		self.frames = JoinableQueue(maxsize = 0)
+		self.frames = JoinableQueue(maxsize = 50)
 		self.stopped = False
-
-	def start(self):
+	def start(self, event):
 		# start the thread to read frames from the video stream
-		t = Thread(target=self.update, args=())
+		t = Thread(target=self.update, args=(event,))
 		t.daemon = True
 		t.start()
 		self.worker = Process(target=self.save, args=())
@@ -73,10 +73,9 @@ class PiVideoStream:
 		self.worker2.start()
 		print("started")
 		return self
-
 	def save(self):
 		#Ignore keyboard interrupt, we want this to continue until done
-		signal.signal(signal.SIGINT, signal.SIG_IGN)
+		#signal.signal(signal.SIGINT, signal.SIG_IGN)
 		while True:
 			frame, frameCount = self.frames.get()
 			#gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -85,17 +84,16 @@ class PiVideoStream:
 			if frameCount % 100 == 0:
 				print("save", frameCount)
 			del frame
-			if frameCount % 1000 == 0:
+			if frameCount % 500 == 0:
 				os.system("echo 1 > /proc/sys/vm/drop_caches")
 			self.frames.task_done()
-
-	def update(self):
+	def update(self, event):
 		# keep looping infinitely until the thread is stopped
 		"""
 		while True:
 			if self.camera.timestamp > self.lastTime:
 				self.frameCount += 1
-				self.lastTime = self.camera.timestamp
+				selcf.lastTime = self.camera.timestamp
 			sleep(0.02)
 			if self.stopped:
 				self.camera.stop_recording()
@@ -112,26 +110,18 @@ class PiVideoStream:
 			self.rawCapture.truncate(0)
 			self.frames.put((self.frame, self.frameCount))
 			self.frame = None
-#			if self.hdf5 is None:
-#				self.hdf5 = tables.open_file(self.folder + "/video.hdf5", mode="w")
-#				self.frameStore = self.hdf5.create_earray(self.hdf5.root, 'raw_images',
-#					tables.Atom.from_dtype(self.frame.dtype),
-#					shape = (0, self.camera.resolution[1], self.camera.resolution[0], 3))
-#				print("hdf5 init")
-			# if the thread indicator variable is set, stop the thread
-			# and resource camera resources
 			sleep(max(0.5/(self.camera.framerate) - time(), 0))
-			if self.stopped:
+                        if event.isSet() or self.frames.full():
 				self.stream.close()
 				self.rawCapture.close()
 				self.camera.close()
+                                self.stop()
 				return
-
 	def read(self):
 		# return the frame (number) most recently read
 		return self.frameCount
-
 	def stop(self):
+        
 		# indicate that the thread should be stopped
 		self.stopped = True
 		sleep(1)
@@ -141,4 +131,3 @@ class PiVideoStream:
 #		self.hdf5.close()
 #		os.system("sudo mv " + self.folder + "/mnt/frameData/" + self.time)
 		print("done")
-
