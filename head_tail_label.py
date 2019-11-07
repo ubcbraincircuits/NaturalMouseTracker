@@ -24,17 +24,17 @@ dataPath = args.get("name")
 dataDrive = args.get("drive", "frameData")
 
 config_path = '/home/user/CropMouseLabel-Braeden-2019-09-11/config.yaml'
-#deeplabcut.analyze_videos(config_path, ["/home/user/MouseTrackingSystem/darknet/videos" + dataPath], videotype=".avi", save_as_csv=True)
+#deeplabcut.analyze_videos(config_path, [dataDrive + dataPath + "/videos"], videotype=".avi", save_as_csv=True)
 
-with open ("darknet/processed" +  dataPath + ".json", "r") as darkFile:
+with open (dataDrive + dataPath + "/processed.json", "r") as darkFile:
     darkData = json.loads(darkFile.read())
 
 for tag, datum in darkData.items():
-    for file in os.listdir('darknet/videos' + dataPath):
+    for file in os.listdir(dataDrive + dataPath + "/videos"):
         if fnmatch.fnmatch(file, tag + '*.csv'):
             json_index = 0
-            with open('darknet/videos' + dataPath + "/" + file) as csvfile:
-                with open('darknet/videos' + dataPath + "/" + tag + ".txt") as tfile:
+            with open(dataDrive + dataPath + "/videos" + "/" + file) as csvfile:
+                with open(dataDrive + dataPath + "/videos" + "/" + tag + ".txt") as tfile:
                     reader = list(csv.reader(csvfile))
                     frames = tfile.readlines()
                     print(len(frames))
@@ -127,5 +127,5 @@ while True:
                 break
     video.write(frame_rgb)
 video.release()
-with open("darknet/processed" + dataPath + "_ht.json", "w") as outfile:
+with open(dataDrive + dataPath + "/processed_ht.json", "w") as outfile:
     json.dump(darkData, outfile, ensure_ascii=False)

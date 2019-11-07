@@ -465,7 +465,7 @@ def YOLO(trialName, mice, RFID, showVideo):
         print(mouse.tag(), str(len(mouse.recordedPositions)/frameCount*100) + "% Covered")
     print(list(map(lambda x: str(x[0]) + ":" + str(len(x[1])), event.items())))
     print("frames without all mice: ", badDetections, badDetections/frameCount*100,  "% error")
-    with open("processed" + dataPath+ ".json", "w") as outfile:
+    with open(dataDrive + dataPath + "/processed.json", "w") as outfile:
         json.dump(mouseDict, outfile, ensure_ascii=False)
 
 

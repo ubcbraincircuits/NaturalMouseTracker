@@ -28,7 +28,7 @@ dataDrive = args.get("drive", "frameData")
 frames = False
 if args.get("frames", None) is not None:
     frames = True
-darkFile = open("processed" + dataPath + ".json", "r")
+darkFile = open(dataDrive + dataPath + "processed.json", "r")
 darkData = json.loads(darkFile.read())
 
 temp = input("Show overall track?")
@@ -94,7 +94,7 @@ if temp[0].lower() == 'y':
         break
     plt.show()
 fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # 'x264' doesn't work
-main = cv2.VideoWriter('output_filtered_' + dataPath + '.avi',fourcc, 15.0, (912, 720))
+main = cv2.VideoWriter('output_filtered_' + dataPath + '.avi', fourcc, 15.0, (912, 720))
 frameCount = 2
 lastFrameDict = {}
 # 'x264' doesn't work2018121290,2018121255,801010273,2018121360
@@ -102,18 +102,18 @@ videos = {}
 files = {}
 filters = {}
 try:
-    shutil.rmtree("videos" + dataPath)
+    shutil.rmtree(dataDrive + dataPath + "/videos")
 except Exception as e:
     print(str(e))
     pass
 finally:
-    os.mkdir("videos" + dataPath)
+    os.mkdir(dataDrive + dataPath + "/videos")
 for tag, datum in darkData.items():
     if len(datum) < 1:
         break
-    videos.update({tag: cv2.VideoWriter("videos" + dataPath + "/" + tag + ".avi" ,fourcc, 15.0, (912, 720))})
+    videos.update({tag: cv2.VideoWriter(dataDrive + dataPath + "/videos/" + tag + ".avi" ,fourcc, 15.0, (912, 720))})
     lastFrameDict.update({tag: 0})
-    files.update({tag: open("videos" + dataPath + "/"+ tag + ".txt", "w")})
+    files.update({tag: open(dataDrive + dataPath + "/videos/" + tag + ".txt", "w")})
     del_t = 0.1
     f = KalmanFilter(dim_x = 6, dim_z = 2)
     f.x = np.array([darkData[tag][0][0], 0., 0., darkData[tag][0][1], 0., 0])
