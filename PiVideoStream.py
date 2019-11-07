@@ -33,7 +33,6 @@ class PiVideoStream:
 		self.time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
 		self.folder = "/mnt/frameData/" + self.time
 		os.mkdir(self.folder)
-		signal.signal(signal.SIGINT, self.stopHandler)
 		'''
 		except:
 			print('file exists')
@@ -111,11 +110,11 @@ class PiVideoStream:
 			self.frames.put((self.frame, self.frameCount))
 			self.frame = None
 			sleep(max(0.5/(self.camera.framerate) - time(), 0))
-                        if event.isSet() or self.frames.full():
+			if event.isSet() or self.frames.full():
 				self.stream.close()
 				self.rawCapture.close()
 				self.camera.close()
-                                self.stop()
+				self.stop()
 				return
 	def read(self):
 		# return the frame (number) most recently read
@@ -126,7 +125,6 @@ class PiVideoStream:
 		self.stop()
 
 	def stop(self):
-        
 		# indicate that the thread should be stopped
 		self.stopped = True
 		sleep(1)

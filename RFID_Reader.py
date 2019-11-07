@@ -2,8 +2,9 @@
 from multiprocessing import Process
 from smbus import SMBus
 import os
+import sys
 import time
-import subprocess
+import signal
 import RPi.GPIO as GPIO
 import datetime
 from random import shuffle
@@ -106,7 +107,7 @@ If any mice detected, save their tag and position with the frame number.
 """
 frameCount = 0
 
-def scan(reader, f, readerNum, event):
+def scan(reader, f, readerNum):
     global frameCount, startTime
     mice = []
     try:
@@ -134,10 +135,16 @@ def readTag(tagID):
         return (int(number, 16), tagID)
     except Exception as e:
         return False
+
+def stopHandler(signal, frame):
+    global event
+    event.set()
+    print("event fired")
+
 #recording
 def record():
+    global frameCount, event
     event = threading.Event()
-    global frameCount, startTime
     RFID_serialPort = '/dev/ttyUSB0'
     #RFID_serialPort = '/dev/serial0'
     #RFID_serialPort='/dev/cu.usbserial-AL00ES9A'
@@ -153,52 +160,64 @@ def record():
     reader1 = TagReader ('/dev/ttyUSB1', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader2 = TagReader ('/dev/ttyUSB2', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
     reader3 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
-#Pi video sttream object    Pi
-    vs = PiVideoStream(trialName=trialName).start()
+
+    #Pi video sttream object    Pi
+    vs = PiVideoStream(trialName=trialName).start(event)
     folder = "/mnt/frameData/" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
     video = folder + "/tracking_system" + trialName + ".h264"
+   
+    #Override interrupt with stop Handler, all child processes ignore interrupt
+    signal.signal(signal.SIGINT, stopHandler)
 
-   # os.mkdir(folder)
-   # os.system("sudo rm /home/pi/tmp.txt")
-   # os.system("sudo touch /home/pi/tmp.txt")
-   #Actual stuff starts here
-   # os.system("sudo raspivid -t 0 -w 912 -h 720 -fps 15 -ex off -o " + video + " -pts /home/pi/tmp.txt &")
+    # os.mkdir(folder)
+    # os.system("sudo rm /home/pi/tmp.txt")
+    # os.system("sudo touch /home/pi/tmp.txt")
+    #Actual stuff starts here
+    # os.system("sudo raspivid -t 0 -w 912 -h 720 -fps 15 -ex off -o " + video + " -pts /home/pi/tmp.txt &")
     print('camera')
     time.sleep(2)
     with open (vs.folder + "/RTS_test.txt" , "w") as f:
         startTime = time.time()
  #THreading start stuff
-        thread0 = Process(target=scan, daemon= True, args=(reader0, f, 0,)
-        thread1 = Process(target=scan, daemon= True, args=(reader1, f, 1,)
-        thread2 = Process(target=scan, daemon= True, args=(reader2, f, 2,)
-        thread3 = Process(target=scan, daemon= True, args=(reader3, f, 3,)
+        thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0,))
+        thread0.daemon = True
+        thread1 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 1,))
+        thread1.daemon = True
+        thread2 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 2,))
+        thread2.daemon = True
+        thread3 = Process(target=scan, daemon= True, args=(reader3, f, 3,))
+        thread3.daemon = True
         thread0.start()
         thread1.start()
         thread2.start()
         thread3.start()
         while True:
-            try:
-                time.sleep(0.03)
-                frameCount = vs.read()
-#               cv2.imshow("Mouse Tracking", frame)
-#               key = cv2.waitKey(1)& 0xFF
-                if not thread0.is_alive():
-                    thread0 = Process(target=scan, daemon= True, args=(reader0, f, 0))
-                    thread0.start()
-                if not thread1.is_alive():
-                    thread1 = Process(target=scan, daemon= True, args=(reader1, f, 1))
-                    thread1.start()
-                if not thread2.is_alive():
-                    thread2 = Process(target=scan, daemon= True, args=(reader2, f, 2))
-                    thread2.start()
-                if not thread3.is_alive():
-                    thread3 = Process(target=scan, daemon= True, args=(reader3, f, 3))
-                    thread3.start()
-            except KeyboardInterrupt:
-               endTime = time.time()
-               event.set()
-              # os.system("sudo kill -s 2 $(pgrep raspivid)")
-               break
+            time.sleep(0.03)
+            frameCount = vs.read()
+#           cv2.imshow("Mouse Tracking", frame)
+#           key = cv2.waitKey(1)& 0xFF
+            if not thread0.is_alive():
+                thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, f, 0))
+                thread0.daemon = True
+                thread0.start()
+            if not thread1.is_alive():
+                thread1 = threading.Thread(target=scan, daemon= True, args=(reader1, f, 1))
+                thread1.daemon = True
+                thread1.start()
+            if not thread2.is_alive():
+                thread2 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 2))
+                thread2.daemon = True
+                thread2.start()
+            if not thread3.is_alive():
+                thread3 = threading.Thread(target=scan, daemon= True, args=(reader3, f, 3))
+                thread3.daemon = True
+                thread3.start()
+            if event.isSet():
+                vs.frames.join()
+                print("done")
+                sys.exit(0)
+               # os.system("sudo kill -s 2 $(pgrep raspivid)")
+                break
     """
     duration = endTime - startTime
     lastFrameTime = float(subprocess.check_output(['tail', '-1', "/home/pi/tmp.txt"])[0:-1])
