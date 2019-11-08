@@ -3,6 +3,7 @@
 Slightly changed from the imutils package to accomodate this system.
 Credit to the authors of imutils.
 """
+import gc
 from picamera.array import PiRGBArray
 import datetime
 from time import sleep, time
@@ -55,7 +56,7 @@ class PiVideoStream:
 		# initialize the frame and the variable used to indicate
 		# if the thread should be stopped
 		self.frame = None
-		self.frames = JoinableQueue(maxsize = 50)
+		self.frames = JoinableQueue(maxsize = 75)
 		self.stopped = False
 	def start(self, event):
 		# start the thread to read frames from the video stream
@@ -99,6 +100,7 @@ class PiVideoStream:
 				return
 		"""
 		for f in self.stream:
+			gc.collect()
 			# grab the frame from the stream and clear the stream in
 			# preparation for the next frame
 			start = time()
@@ -110,11 +112,20 @@ class PiVideoStream:
 			self.frames.put((self.frame, self.frameCount))
 			self.frame = None
 			sleep(max(0.5/(self.camera.framerate) - time(), 0))
-			if event.isSet() or self.frames.full():
+			if self.frames.full():
+				self.worker.terminate()
+				self.worker1.terminate()
+				self.worker2.terminate()
+				self.frames = JoinableQueue()
+				self.frames.close()
+				event.set()
+				print("fired event")
+			if event.isSet():
 				self.stream.close()
 				self.rawCapture.close()
 				self.camera.close()
 				self.stop()
+				gc.collect()
 				return
 	def read(self):
 		# return the frame (number) most recently read

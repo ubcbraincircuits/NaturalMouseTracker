@@ -1,4 +1,5 @@
 #Imports
+import gc
 from multiprocessing import Process
 from smbus import SMBus
 import os
@@ -213,6 +214,7 @@ def record():
                 thread3.daemon = True
                 thread3.start()
             if event.isSet():
+                print('caught event')
                 vs.frames.join()
                 print("done")
                 sys.exit(0)
