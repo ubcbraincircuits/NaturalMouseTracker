@@ -7,5 +7,5 @@ cd darknet
 C:/Python36/python.exe darknet_video.py -n %name% -d %drive%
 C:/Python36/python.exe visualize.py -n %name% -d %drive%
 cd ../
-python head_tail_label.py -n %name%
+rem python head_tail_label.py -n %name%
 set /p name="Done!"
