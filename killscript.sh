@@ -7,4 +7,7 @@ then sudo reboot
 fi
 echo "ended succesfully"
 echo 1 > /proc/sys/vm/drop_caches 
+sudo umount /mnt/frameData
+sleep 1
+sudo mount /dev/sda2 /mnt/frameData
 sudo /usr/bin/python3 /home/pi/MouseTrackingSystem/RFID_Reader.py

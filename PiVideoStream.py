@@ -3,7 +3,7 @@
 Slightly changed from the imutils package to accomodate this system.
 Credit to the authors of imutils.
 """
-import gc
+#import gc
 from picamera.array import PiRGBArray
 import datetime
 from time import sleep, time
@@ -28,6 +28,7 @@ class PiVideoStream:
 		self.camera.resolution = resolution
 		resolution = self.camera.resolution
 		self.camera.exposure_mode = "off"
+		self.camera.color_effects = (128,128)
 		self.camera.framerate = framerate
 		self.lastTime = 0.0
 		self.frameCount = 0
@@ -100,7 +101,7 @@ class PiVideoStream:
 				return
 		"""
 		for f in self.stream:
-			gc.collect()
+
 			# grab the frame from the stream and clear the stream in
 			# preparation for the next frame
 			start = time()
