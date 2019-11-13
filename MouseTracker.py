@@ -97,7 +97,7 @@ class MouseTracker:
             self.visualTracker = None
             return False
         else:
-            self.visualStartPoint = self.currCoord[3]
+            self.visualStartPoint = self.currCoord
             self.canDoVisual = False
             return True
 
@@ -105,7 +105,7 @@ class MouseTracker:
         self.visualTracker = None
         self.visualCount = 0
         if delete:
-            self.trimPositions(self.visualStartPoint)
+            self.trimPositions(self.visualStartPoint[3])
         else:
             self.canDoVisual = True
 

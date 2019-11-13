@@ -28,7 +28,7 @@ dataDrive = args.get("drive", "frameData")
 frames = False
 if args.get("frames", None) is not None:
     frames = True
-darkFile = open(dataDrive + dataPath + "processed.json", "r")
+darkFile = open(dataDrive + dataPath + "/processed.json", "r")
 darkData = json.loads(darkFile.read())
 
 temp = input("Show overall track?")

@@ -159,7 +159,8 @@ def YOLO(trialName, mice, RFID, showVideo):
     for mouse in mice:
         lostTrackers.append(mouse)
         mice = []
-
+    table = np.array([((i/255.0) ** 0.75)*255 #0.7 to 0.9 seems like a good range.
+        for i in np.arange(0, 256)]).astype('uint8')
     while True:
         RFIDIndices = []
         try:
@@ -182,6 +183,7 @@ def YOLO(trialName, mice, RFID, showVideo):
                                        (darknet.network_width(netMain),
                                         darknet.network_height(netMain)),
                                        interpolation=cv2.INTER_LINEAR)
+            frame_resized = cv2.LUT(frame_resized, table)
         except Exception as e:
             print(str(e))
             # no more frames
@@ -278,6 +280,8 @@ def YOLO(trialName, mice, RFID, showVideo):
                         print('vis')
                         event['visual'].append((frameName, tracker.tag()))
                         tracker.updatePosition([bbox[0] - bbox[2]/2, bbox[1] - bbox[3]/2], frameName, frameCount, bbox[2], bbox[3])
+                        if tracker.distanceFromPos(tracker.visualStartPoint) > 50:
+                            tracker.stopVisualTracking()
                     else:
                         tracker.stopVisualTracking()
             #====================Adding to Partial Lost================================
@@ -365,7 +369,7 @@ def YOLO(trialName, mice, RFID, showVideo):
                         if len(nearestMice) < 1 or nearestMice[0].distanceFromPos(readerPos) > 300:
                             #If nearest mouse is not currently detected. do nothing
                             break
-                        if len(nearestMice) > 2 and abs(nearestMice[0].distanceFromPos(readerPos) - nearestMice[1].distanceFromPos(readerPos)) < 75:
+                        if len(nearestMice) >= 2 and abs(nearestMice[0].distanceFromPos(readerPos) - nearestMice[1].distanceFromPos(readerPos)) < maxSwapDistance:
                             # We cannot be certain which one is over the reader
 #                                print("cannot be sure")
                             break
@@ -394,7 +398,8 @@ def YOLO(trialName, mice, RFID, showVideo):
                             badMouse.trimPositions(occlusionStartPoint)
                             mice.append(tracker)
                             lostTrackers.remove(tracker)
-                            lostTrackers.append(badMouse)
+                            if badMouse not in lostTrackers:
+                                lostTrackers.append(badMouse)
                             mice.remove(badMouse)
                 if not usedIndex:
                     """
@@ -407,7 +412,7 @@ def YOLO(trialName, mice, RFID, showVideo):
                     if len(nearestMice) < 1 or nearestMice[0].distanceFromPos(readerPos) > 300:
                         #If nearest mouse is not currently detected. do nothing
                         break
-                    if len(nearestMice) < 2 or abs(nearestMice[0].distanceFromPos(readerPos) - nearestMice[1].distanceFromPos(readerPos)) > 75:
+                    if len(nearestMice) < 2 or abs(nearestMice[0].distanceFromPos(readerPos) - nearestMice[1].distanceFromPos(readerPos)) > maxSwapDistance:
                         #IDENTITY SWAP
                         if nearestMice[0].tag() != int(ln[0]):
                             #Identity swap, increment number identity swaps
@@ -457,7 +462,7 @@ def YOLO(trialName, mice, RFID, showVideo):
 
         print(list(map(lambda x: x.tag(), mice)),"mice")
         print(list(map(lambda x: x.tag(), lostTrackers)), "lost")
-#        input("next")
+        # input("next")
 #        time.sleep(0.2)
     mouseDict = {}
     for mouse in mouseTrackers:
