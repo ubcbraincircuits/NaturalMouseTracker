@@ -95,6 +95,8 @@ if temp[0].lower() == 'y':
     plt.show()
 fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # 'x264' doesn't work
 main = cv2.VideoWriter('output_filtered_' + dataPath + '.avi', fourcc, 15.0, (912, 720))
+table = np.array([((i/255.0) ** 0.75)*255 #0.7 to 0.9 seems like a good range.
+    for i in np.arange(0, 256)]).astype('uint8')
 frameCount = 2
 lastFrameDict = {}
 # 'x264' doesn't work2018121290,2018121255,801010273,2018121360
@@ -158,6 +160,7 @@ while True:
             if not success:
                 break
         frameCount += 1
+        frame_read = cv2.LUT(frame_read, table)
         frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2GRAY)
         frame_rgb_c = cv2.cvtColor(frame_read, cv2.COLOR_BGR2GRAY)
         frame_rgb = cv2.cvtColor(frame_rgb, cv2.COLOR_GRAY2RGB)
@@ -173,7 +176,7 @@ while True:
         while True:
             if len(datum) <= lastFrameDict[tag]:
                 break
-            if datum[lastFrameDict[tag]][3] == frameCount:
+            if datum[lastFrameDict[tag]][3] == frameCount -1:
                 w, h = datum[lastFrameDict[tag]][4]*912/640,\
                     datum[lastFrameDict[tag]][5]*720/640
                 z = np.array([[datum[lastFrameDict[tag]][0]], [datum[lastFrameDict[tag]][1]]])
@@ -188,7 +191,7 @@ while True:
                 blank_image = np.ones((720,912,3), np.uint8)*255
                 blank_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] = frame_rgb[pt1[1]:pt2[1], pt1[0]:pt2[0]]
                 videos[tag].write(blank_image)
-                files[tag].write(str(frameCount) + "\n")
+                files[tag].write(str(frameCount -1) + "\n")
                 cv2.rectangle(frame_rgb_c, pt1, pt2, (0, 255, 0), 1)
                 cv2.circle(frame_rgb_c, (int(x), int(y)), 5,  [0, 255, 0])
                 #cv2.arrowedLine(frame_rgb_c, (int(x - vel_x), int(y - vel_y)), (int(x + vel_x), int(y + vel_y)), [0, 0, 255])
@@ -198,7 +201,7 @@ while True:
                             [0, 255, 0], 2)
                 break
 
-            elif datum[lastFrameDict[tag]][3] < frameCount:
+            elif datum[lastFrameDict[tag]][3] < frameCount -1:
                 lastFrameDict[tag] += 1
             else:
                 break

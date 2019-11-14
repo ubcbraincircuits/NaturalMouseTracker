@@ -166,6 +166,7 @@ def YOLO(trialName, mice, RFID, showVideo):
         try:
             validationFrame = False
             frameName = dataDrive + dataPath + "/tracking_system" + trialName + str(frameCount) + ".jpg"
+            print(frameName, 'b')
             while dataDrive + dataPath + "/" + RFID[lastRFIDIndex + 1].split(';')[2].strip('\n') == frameName:
                 RFIDIndices.append(lastRFIDIndex + 1)
                 validationFrame = True
@@ -252,6 +253,7 @@ def YOLO(trialName, mice, RFID, showVideo):
         """
         Any unassigned detections are given dummy tags.
         """
+        print(frameName)
         sortedDetections = sorted(detections, key=lambda l: l[1])
         for detection in sortedDetections:
             if len(mice) >= miceNum:

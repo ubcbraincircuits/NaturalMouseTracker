@@ -131,7 +131,7 @@ class MouseTracker:
             if rec[3] >= frameCount:
                 index = self.recordedPositions.index(rec)
                 break
-        if index > self.validatedIndex:
+        if index and index > self.validatedIndex:
             self.validatedIndex = index
         tempPositions = self.recordedPositions[self.validatedIndex + 1:]
         self.recordedPositions = self.recordedPositions[:self.validatedIndex+1]
