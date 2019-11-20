@@ -32,12 +32,13 @@ class MouseTracker:
         self.lastFrameCount = 0
         self.velocity = (0,0)
 
-    def updatePosition(self, coordinate, frame='', frameCount = 0, width = 0, height = 0):
+    def updatePosition(self, coordinate, frame='', frameCount = 0, width = 0, height = 0, miceNum = 1):
         self.currCoord = coordinate
         coordinate.append(frame)
         coordinate.append(frameCount)
         coordinate.append(width)
         coordinate.append(height)
+        coordinate.append(miceNum)
         if (frameCount - self.lastFrameCount) > 5:
             self.lastPos = None
         self.lastFrameCount = frameCount

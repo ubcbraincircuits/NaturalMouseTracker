@@ -6,6 +6,60 @@ from contextlib import ExitStack
 import re
 
 
+
+#Additional behaviours from Tony:
+
+# Behaviours involving one mouse
+# 1) Nesting/Untracked
+# 2) Active in tracked area
+# 3) Stationary in corner
+# 4) Stationary against wall
+# 5) Center region
+
+
+# 8) Average speed #AFTER
+# 9) Distance traveled #AFTER
+# 10) Acceleration >>> Need more specific .. (average A, instantaneous A at frame of interest?)
+# 11) only mouse (self) tracked
+
+
+# 12) Self alone in nesting area
+
+# Behaviours involving 2 mice
+# 13) self tracked with one other mouse
+# 14) self and 1 other mouse head to head
+# 15) Grooming *Difficult*
+# 16) Self and 1 other in Nesting
+# 17) self Following another mouse
+# 18) self head to side of other mouse
+# 19) self head to Agenovential of other mouse
+# 20) two mice side by side contact
+# 21) self Squeeze between wall and 1 other mouse
+# 22) Fighting *Unsure* possibly easy given some intuition, but most likely difficult
+
+#behaviours involving 3 or more mice
+# 23) self squeeze between 2 other mice
+# 24) self and 2 other in Nesting
+# 25) Self tracked with 2 other mice
+
+#Behaviours with > 3 mice:
+# 26) self and 3 others in Nesting
+# 27) Self tracked with 3 other mice
+
+#Import questions
+#When mouse A does a behaviour to Mouse B, is the behavioural data still valid if we dont know the true identity of B.
+    #Essentiall we need to decide if (mouse290 approaches mouse376 == mouse290 approaches dummy) evaluates to True
+#If we count them as equal, we have to tweak the output format because the "behaviour: tag_other_mouse" output will include dummy tags
+#If we dont count them as equal, then we must throw out any multi mouse behaviour where any mouse is a dummy
+
+# Is mouse orientation during approach considered? Is it still an approach if a mouse walks up to another one backwards
+#(I know mice dont walk backwards, but sloppy deeplabcut labels could also cause)
+
+#Indentities not currently tracked within group forming and leaving.
+
+
+
+
 def distanceBetweenPos(p1, p2):
     if p1 is None or p2 is None:
         return False
@@ -36,8 +90,8 @@ dataDrive = args.get("drive", "frameData")
 darkFile = open(dataDrive + dataPath + "/processed.json", "r")
 darkData = json.loads(darkFile.read())
 
-mouseDict = {}
-lastFrameDict = {}
+mouseDict = {} #Holds key=value pair in format Tag=List where every index is a frame
+lastFrameDict = {} # Holds key=value pairs in format Tag=last index of data from json file added
 for tag in darkData.keys():
     mouseDict.update({tag: []})
     lastFrameDict.update({tag: 0})
@@ -53,10 +107,10 @@ while True:
             for i in range(lastFrameDict[tag], len(datum)):
                 if datum[i][3] == frameCount:
                     if len(datum[i]) > 4:# if datum[row].length() > 4 what does that mean and why do we scale values
-                        x, y, w, h = datum[i][0]*912/640,\ #darknet outputs square
+                        x, y, w, h = datum[i][0]*912/640,\
                             datum[i][1]*720/640,\
                             datum[i][4]*912/640,\
-                            datum[i][5]*720/640
+                            datum[i][5]*720/640  #darknet outputs square
                     else:
                         x, y, w, h = datum[i][0]*912/640,\
                             datum[i][1]*720/640, 0, 0
@@ -90,19 +144,24 @@ twoGroupLeavingFrames = []
 threeGroupFormingFrames = []
 threeGroupLeavingFrames = []
 lastGroup = set()
+date, timestamp = dataPath.split('_')
 for tag, name in files.items():
     files[tag] = open(name, 'w')
-    files[tag].write("Frame,Behaviour,Center_x,Center_y,Width," +
-                        "Height,Head_x,Head_y,Tail_x,Tail_y\n")
-for i in range(0, totalFrames):
+    files[tag].write("Date,Time,Behaviour,Others_Involved,Location," + \
+                        "Center_x,Center_y,Width," + \
+                        "Height,Head_x,Head_y,Tail_x,Tail_y," + \
+                        "L_Ear_x,L_Ear_y,R_Ear_x,R_Ear_y," + \
+                        "Velocity_x,Velocity_y,Speed,\n")
+for i in range(0, totalFrames): #Iterate over all frames
+
     group = set()
     print(i)
     for mouse, positions in mouseDict.items():
         behaviourAssigned = False
         if len(positions) <= i:
-            files[mouse].write(str(i) + ",Nesting\n")
+            files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Nesting\n")
             break
-        if i > 1 and positions[i-1] is not None and positions[i] is not None:
+        if i >= 1 and positions[i-1] is not None and positions[i] is not None: #If we have atleast 1 detection and it is not the first
             velocities.update({mouse:(positions[i][0][0] - positions[i-1][0][0],
                 positions[i][0][1] - positions[i-1][0][1])})
         else:
@@ -111,7 +170,7 @@ for i in range(0, totalFrames):
             if mouse != other:
                 if len(positions) <= i or len(other_pos) <= i:
                     continue
-                dist = distanceBetweenPos(positions[i], other_pos[i])
+                dist = distanceBetweenPos(positions[i], other_pos[i]) #distance between two mice
                 if dist and dist < group_radius:
                     group.add(mouse)
                     group.add(other)
@@ -125,33 +184,66 @@ for i in range(0, totalFrames):
                         if len(approaches[mouse]) == 0 or  approaches[mouse][-1][0] < i -10:
                             approaches[mouse].append((i, other))
                             behaviourAssigned = True
-                            files[mouse].write(str(i) + ",Approaching:"+str(other) + ",")
+                            files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Approaching,"+str(other) + ",")
         if mouse in group:
             behaviourAssigned = True
             if mouse not in lastGroup:
-                files[mouse].write(str(i) + ",GroupEntering,")
+                files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",GroupEntering,")
             else:
                 if velocities[mouse] and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > velocity_thresh:
-                    files[mouse].write(str(i) + ",Grouping,")
+                    files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Grouping,")
                 else:
-                    files[mouse].write(str(i) + ",Nesting,")
+                    files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Nesting,")
+            writeStr = " "
+            for other in group:
+                if other != mouse:
+                    writeStr += other + ';'
+            files[mouse].write(writeStr[:-1] + ',')
         else:
             if mouse in lastGroup:
-                files[mouse].write(str(i) + ",GroupLeaving,")
+                files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",GroupLeaving,")
                 behaviourAssigned = True
+                writeStr = " "
+                for other in lastGroup:
+                    if other != mouse:
+                        writeStr += other + ';'
+                files[mouse].write(writeStr[:-1] + ',')
+
         if not behaviourAssigned:
             if velocities[mouse] and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > velocity_thresh:
-                files[mouse].write(str(i) + ",Exploring,")
+                files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Exploring,")
             elif positions[i] is None:
                 if (i > 5 and positions[i -5] is None) or (i < totalFrames - 6 and positions[i+5] is None):
-                    files[mouse].write(str(i) + ",Nesting,")
+                    files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Nesting,")
                 else:
-                    files[mouse].write(str(i) + ",Untracked,")
+                    files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Untracked,")
             else:
-                files[mouse].write(str(i) + ",None,")
+                files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Stationary,")
+            files[mouse].write("NULL,")
         if positions[i] is not None:
+            x, y = positions[i][0]
+            if x > 912*3/4 or x < 912*1/4:
+                if y > 720*3/4 or y < 720*1/4:
+                    files[mouse].write("Corner,")
+                else:
+                    files[mouse].write("Wall,")
+            elif y > 912*3/4 or y < 912*1/4:
+                files[mouse].write("Wall,")
+            else:
+                files[mouse].write("Center,")
+            count = 0
             for aspect in positions[i]:
-                files[mouse].write(re.sub('[^A-Za-z0-9\,\.]+', '', str(aspect)) + ",")
+                count += 1
+                files[mouse].write(re.sub('[^A-Za-z0-9,.]+', '', str(aspect)) + ",")
+            while count < 11:  # Number of potential positions (i.e head, tail)
+                files[mouse].write('NULL,')
+                count += 1
+        if velocities[mouse] is not None:
+            x, y = velocities[mouse]
+            speed = np.sqrt(x**2 + y**2)
+            files[mouse].write(str(x) + ',' + str(y) + "," + str(speed) + ',')
+        else:
+            files[mouse].write('0,0,0,')
         files[mouse].write("\n")
     if len(group) == 2 and len(lastGroup) < 2:
         twoGroupFormingFrames.append(i)

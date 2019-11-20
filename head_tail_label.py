@@ -29,7 +29,7 @@ config_path = '/home/user/CropMouseLabel-Braeden-2019-09-11/config.yaml'
 with open (dataDrive + dataPath + "/processed.json", "r") as darkFile:
     darkData = json.loads(darkFile.read())
 
-for tag, datum in darkData.items():
+for tag, positions in darkData.items():
     for file in os.listdir(dataDrive + dataPath + "/videos"):
         if fnmatch.fnmatch(file, tag + '*.csv'):
             json_index = 0
@@ -47,9 +47,9 @@ for tag, datum in darkData.items():
                         except Exception as e:
                             print(str(e))
                             continue
-                        while int(datum[json_index][3]) < int(row[0]):
+                        while int(positions[json_index][3]) < int(row[0]):
                             json_index += 1
-                        if int(datum[json_index][3]) > int(row[0]):
+                        if int(positions[json_index][3]) > int(row[0]):
                             continue
                         i = 3
                         while i < 13:
@@ -57,11 +57,11 @@ for tag, datum in darkData.items():
                                 print(i, len(row), row[0])
                                 print(json_index)
                             if row[i] > likelihood_thresh:
-                                datum[json_index].append(row[i-2])
-                                datum[json_index].append(row[i-1])
+                                positions[json_index].append(row[i-2])
+                                positions[json_index].append(row[i-1])
                             else:
-                                datum[json_index].append(None)
-                                datum[json_index].append(None)
+                                positions[json_index].append(None)
+                                positions[json_index].append(None)
                             i += 3
                         json_index += 1
 
@@ -82,24 +82,24 @@ while True:
     except Exception as e:
         print(str(e))
         break
-    for (tag, datum) in darkData.items():
+    for (tag, positions) in darkData.items():
         while True:
-            if len(datum) <= lastFrameDict[tag]:
+            if len(positions) <= lastFrameDict[tag]:
                 break
-            if datum[lastFrameDict[tag]][3] == frameCount:
-                x, y, w, h = datum[lastFrameDict[tag]][0]*912/640,\
-                    datum[lastFrameDict[tag]][1]*720/640,\
-                    datum[lastFrameDict[tag]][4]*912/640,\
-                    datum[lastFrameDict[tag]][5]*720/640
+            if positions[lastFrameDict[tag]][3] == frameCount:
+                x, y, w, h = positions[lastFrameDict[tag]][0]*912/640,\
+                    positions[lastFrameDict[tag]][1]*720/640,\
+                    positions[lastFrameDict[tag]][4]*912/640,\
+                    positions[lastFrameDict[tag]][5]*720/640
                 xmin, ymin, xmax, ymax = convertBack(
                     float(x), float(y), float(w), float(h))
                 pt1 = (xmin, ymin)
                 pt2 = (xmax, ymax)
-                if len(datum[lastFrameDict[tag]]) >=10:
-                    head = (datum[lastFrameDict[tag]][6], datum[lastFrameDict[tag]][7])
-                    tail = (datum[lastFrameDict[tag]][8], datum[lastFrameDict[tag]][9])
-                    l_ear = (datum[lastFrameDict[tag]][10], datum[lastFrameDict[tag]][11])
-                    r_ear = (datum[lastFrameDict[tag]][12], datum[lastFrameDict[tag]][13])
+                if len(positions[lastFrameDict[tag]]) >=10:
+                    head = (positions[lastFrameDict[tag]][7], positions[lastFrameDict[tag]][8])
+                    tail = (positions[lastFrameDict[tag]][9], positions[lastFrameDict[tag]][10])
+                    l_ear = (positions[lastFrameDict[tag]][11], positions[lastFrameDict[tag]][12])
+                    r_ear = (positions[lastFrameDict[tag]][13], positions[lastFrameDict[tag]][14])
                     if head != (None, None):
                         head = (int(head[0]), int(head[1]))
                         cv2.circle(frame_rgb, head, 5, [0, 0, 255])
@@ -121,7 +121,7 @@ while True:
                             (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                             [0, 255, 0], 2)
                 break
-            elif datum[lastFrameDict[tag]][3] < frameCount:
+            elif positions[lastFrameDict[tag]][3] < frameCount:
                 lastFrameDict[tag] += 1
             else:
                 break
