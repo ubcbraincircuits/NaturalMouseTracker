@@ -114,7 +114,7 @@ def scan(reader, f, readerNum):
     try:
         Data = reader.readTag()
         if f is not False and Data > 0:
-            frameName = 'tracking_system' + trialName + str(frameCount) + '.png'
+            frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
             print("pickup")
             try:
                 f.write (str(Data)+";"+str(readerMap[readerNum])+";"+frameName+"\n")
@@ -186,7 +186,7 @@ def record():
         thread1.daemon = True
         thread2 = threading.Thread(target=scan, daemon= True, args=(reader2, f, 2,))
         thread2.daemon = True
-        thread3 = Process(target=scan, daemon= True, args=(reader3, f, 3,))
+        thread3 = threading.Thread(target=scan, daemon= True, args=(reader3, f, 3,))
         thread3.daemon = True
         thread0.start()
         thread1.start()
@@ -217,7 +217,7 @@ def record():
                 print('caught event')
                 vs.frames.join()
                 print("done")
-                sys.exit(0)
+                sys.exit(1)
                # os.system("sudo kill -s 2 $(pgrep raspivid)")
                 break
     """

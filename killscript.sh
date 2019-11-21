@@ -9,5 +9,15 @@ echo "ended succesfully"
 echo 1 > /proc/sys/vm/drop_caches 
 sudo umount /mnt/frameData
 sleep 1
-sudo mount /dev/sda2 /mnt/frameData
-sudo /usr/bin/python3 /home/pi/MouseTrackingSystem/RFID_Reader.py
+sudo mount /dev/sda2 /mnt/frameData 
+COUNTER=0
+while [  $COUNTER -lt  3 ]; do
+	sudo /usr/bin/python3 /home/pi/MouseTrackingSystem/RFID_Reader.py || { COUNTER=$((COUNTER+1));}
+	if [  $COUNTER -lt 1 ];
+		then COUNTER=5
+	fi
+done
+
+#if program doesnt run proper , exit code of this shell is 1
+#if the program get sig int and exits smoothly, exit code of this shell is 130
+#if program runs till completion exit code of this shell is 0. (will not happen)
