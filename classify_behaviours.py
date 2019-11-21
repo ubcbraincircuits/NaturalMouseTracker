@@ -238,6 +238,11 @@ for i in range(0, totalFrames): #Iterate over all frames
             while count < 11:  # Number of potential positions (i.e head, tail)
                 files[mouse].write('NULL,')
                 count += 1
+        else:
+            count = 0
+            while count < 13:  # Number of potential positions (i.e head, tail)
+                files[mouse].write('NULL,')
+                count += 1
         if velocities[mouse] is not None:
             x, y = velocities[mouse]
             speed = np.sqrt(x**2 + y**2)
