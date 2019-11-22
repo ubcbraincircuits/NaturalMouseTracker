@@ -23,7 +23,7 @@ args = vars(ap.parse_args())
 dataPath = args.get("name")
 dataDrive = args.get("drive", "frameData")
 
-config_path = '/home/user/CropMouseLabel-Braeden-2019-09-11/config.yaml'
+config_path = 'G://PoseEstimation-Braeden-2019-11-13//config.yaml'
 #deeplabcut.analyze_videos(config_path, [dataDrive + dataPath + "/videos"], videotype=".avi", save_as_csv=True)
 
 with open (dataDrive + dataPath + "/processed.json", "r") as darkFile:
@@ -67,7 +67,7 @@ for tag, positions in darkData.items():
 
 fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
 video = cv2.VideoWriter('output_pairs' + dataPath + '.avi',fourcc, 15.0, (912, 720))
-frameCount = 2
+frameCount = 1
 lastFrameDict = {}
 fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
 for tag in darkData.keys():
@@ -86,7 +86,7 @@ while True:
         while True:
             if len(positions) <= lastFrameDict[tag]:
                 break
-            if positions[lastFrameDict[tag]][3] == frameCount:
+            if positions[lastFrameDict[tag]][3] == frameCount -1:
                 x, y, w, h = positions[lastFrameDict[tag]][0]*912/640,\
                     positions[lastFrameDict[tag]][1]*720/640,\
                     positions[lastFrameDict[tag]][4]*912/640,\
@@ -96,10 +96,10 @@ while True:
                 pt1 = (xmin, ymin)
                 pt2 = (xmax, ymax)
                 if len(positions[lastFrameDict[tag]]) >=10:
-                    head = (positions[lastFrameDict[tag]][7], positions[lastFrameDict[tag]][8])
-                    tail = (positions[lastFrameDict[tag]][9], positions[lastFrameDict[tag]][10])
-                    l_ear = (positions[lastFrameDict[tag]][11], positions[lastFrameDict[tag]][12])
-                    r_ear = (positions[lastFrameDict[tag]][13], positions[lastFrameDict[tag]][14])
+                    head = (positions[lastFrameDict[tag]][6], positions[lastFrameDict[tag]][7])
+                    tail = (positions[lastFrameDict[tag]][8], positions[lastFrameDict[tag]][9])
+                    l_ear = (positions[lastFrameDict[tag]][10], positions[lastFrameDict[tag]][11])
+                    r_ear = (positions[lastFrameDict[tag]][12], positions[lastFrameDict[tag]][13])
                     if head != (None, None):
                         head = (int(head[0]), int(head[1]))
                         cv2.circle(frame_rgb, head, 5, [0, 0, 255])
@@ -121,7 +121,7 @@ while True:
                             (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                             [0, 255, 0], 2)
                 break
-            elif positions[lastFrameDict[tag]][3] < frameCount:
+            elif positions[lastFrameDict[tag]][3] < frameCount -1:
                 lastFrameDict[tag] += 1
             else:
                 break

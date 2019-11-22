@@ -166,7 +166,6 @@ def YOLO(trialName, mice, RFID, showVideo):
         try:
             validationFrame = False
             frameName = dataDrive + dataPath + "/tracking_system" + trialName + str(frameCount) + ".jpg"
-            print(frameName, 'b')
             while dataDrive + dataPath + "/" + RFID[lastRFIDIndex + 1].split(';')[2].strip('\n') == frameName:
                 RFIDIndices.append(lastRFIDIndex + 1)
                 validationFrame = True
@@ -256,6 +255,18 @@ def YOLO(trialName, mice, RFID, showVideo):
         print(frameName)
         sortedDetections = sorted(detections, key=lambda l: l[1])
         for detection in sortedDetections:
+            ignoreDetection = False
+            for mouse in filter(lambda x: x.tag() in updatedTags, mice):
+                if mouse.intersectionOverUnion(detection[2]) != 0:
+                    if detection[2][0] > entranceX and detection[2][1] > entranceY:
+                        break
+                    ignoreDetection = True
+                    for lost in lostTrackers + partialLostTrackers:
+                        if len(lost.recordedPositions) > 0 and (frameCount - lost.recordedPositions[len(lost.recordedPositions)-1][3]) < 10:
+                            ignoreDetection = False
+
+            if ignoreDetection:
+                continue
             if len(mice) >= miceNum:
                 break
             updatedTags.append(dummyTag)
@@ -264,10 +275,6 @@ def YOLO(trialName, mice, RFID, showVideo):
 
         image = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2GRAY)
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        if showVideo:
-            cvDrawBoxes(cleanedDetections, image, mice)
-            cv2.imshow('Demo', image)
-            cv2.waitKey(3)
 
         # =============================Lost Mouse Handling=====================================================
         if len(cleanedDetections) < miceNum:
@@ -276,6 +283,8 @@ def YOLO(trialName, mice, RFID, showVideo):
             error = True
             # ========================Visual Tracking============================================
             for tracker in filter(lambda x: x.tag() not in updatedTags, mice):
+                if tracker.canDoVisual:
+                    tracker.startVisualTracking(frame_resized)
                 if tracker.visualTracker != None:
                     ok, bbox = tracker.visualTracker.update(frame_resized)
                     if ok:
@@ -291,8 +300,6 @@ def YOLO(trialName, mice, RFID, showVideo):
             print(list(map(lambda x: x.tag(), partialLostTrackers)), 'PL')
             for tracker in filter(lambda x: x.tag() not in updatedTags and x not in partialLostTrackers and x.visualTracker == None, mice):
                 print(tracker.tag(), tracker.getPosition(), 'partial lost')
-                if tracker.canDoVisual:
-                    tracker.startVisualTracking(frame_resized)
                 numClose = len(partialLostTrackers)
                 nearest = sorted(list(filter(lambda x: x.tag() in updatedTags, mice)), key= lambda l: l.distanceFromPos(tracker.getPosition()))
                 for nMouse in nearest:
@@ -462,9 +469,13 @@ def YOLO(trialName, mice, RFID, showVideo):
             if len(lostTrackers) == 0:
                 error = False
 
+        if showVideo:
+            cvDrawBoxes(cleanedDetections, image, mice)
+            cv2.imshow('Demo', image)
+            cv2.waitKey(3)
         print(list(map(lambda x: x.tag(), mice)),"mice")
         print(list(map(lambda x: x.tag(), lostTrackers)), "lost")
-        # input("next")
+        input("next")
 #        time.sleep(0.2)
     mouseDict = {}
     for mouse in mouseTrackers:

@@ -27,13 +27,13 @@ import re
 
 # Behaviours involving 2 mice
 # 13) self tracked with one other mouse
-# 14) self and 1 other mouse head to head
+# 14) self and 1 other mouse head to head ***dlc
 # 15) Grooming *Difficult*
 # 16) Self and 1 other in Nesting
-# 17) self Following another mouse
-# 18) self head to side of other mouse
-# 19) self head to Agenovential of other mouse
-# 20) two mice side by side contact
+# 17) self Following another mouse   ***dlc
+# 18) self head to side of other mouse   ***dlc
+# 19) self head to Agenovential of other mouse **dlc
+# 20) two mice side by side contact **dlc 
 # 21) self Squeeze between wall and 1 other mouse
 # 22) Fighting *Unsure* possibly easy given some intuition, but most likely difficult
 
