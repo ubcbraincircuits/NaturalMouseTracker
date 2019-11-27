@@ -61,7 +61,7 @@ class PiVideoStream:
 		# initialize the frame and the variable used to indicate
 		# if the thread should be stopped
 		self.frame = None
-		self.frames = JoinableQueue(maxsize = 75)
+		self.frames = JoinableQueue(maxsize = 150)
 		self.stopped = False
 	def start(self, goodEvent, badEvent):
 		# start the thread to read frames from the video stream
