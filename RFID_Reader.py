@@ -217,7 +217,7 @@ def record():
                 print('caught event')
                 vs.frames.join()
                 print("done")
-                sys.exit(1)
+                sys.exit(0)
                # os.system("sudo kill -s 2 $(pgrep raspivid)")
                 break
     """
