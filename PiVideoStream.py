@@ -121,7 +121,6 @@ class PiVideoStream:
 				self.worker.terminate()
 				self.worker1.terminate()
 				self.worker2.terminate()
-				self.frames = JoinableQueue()
 				self.frames.close()
 				badEvent.set()
 				print("fired event")
