@@ -139,13 +139,14 @@ def readTag(tagID):
 
 def stopHandler(signal, frame):
     global event
-    event.set()
+    goodEvent.set()
     print("event fired")
 
 #recording
 def record():
-    global frameCount, event
-    event = threading.Event()
+    global frameCount, goodEvent, badEvent
+    goodEvent = threading.Event()
+    badEvent = threading.Event()
     RFID_serialPort = '/dev/ttyUSB0'
     #RFID_serialPort = '/dev/serial0'
     #RFID_serialPort='/dev/cu.usbserial-AL00ES9A'
@@ -163,7 +164,7 @@ def record():
     reader3 = TagReader ('/dev/ttyUSB3', RFID_doCheckSum, timeOutSecs = None, kind=RFID_kind)
 
     #Pi video sttream object    Pi
-    vs = PiVideoStream(trialName=trialName).start(event)
+    vs = PiVideoStream(trialName=trialName).start(goodEvent, badEvent)
     folder = "/mnt/frameData/" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
     video = folder + "/tracking_system" + trialName + ".h264"
    
@@ -213,12 +214,17 @@ def record():
                 thread3 = threading.Thread(target=scan, daemon= True, args=(reader3, f, 3))
                 thread3.daemon = True
                 thread3.start()
-            if event.isSet():
+            if goodEvent.isSet():
                 print('caught event')
                 vs.frames.join()
                 print("done")
                 sys.exit(0)
                # os.system("sudo kill -s 2 $(pgrep raspivid)")
+                break
+            if badEvent.isSet():
+                print("frame queue full")
+                print("done")
+                sys.exit(1)
                 break
     """
     duration = endTime - startTime

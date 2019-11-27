@@ -34,6 +34,10 @@ class PiVideoStream:
 		self.frameCount = 0
 		self.time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
 		self.folder = "/mnt/frameData/" + self.time
+		try:
+			os.rmdir(self.folder)
+		except FileNotFoundError:
+			pass
 		os.mkdir(self.folder)
 		'''
 		except:
@@ -59,9 +63,9 @@ class PiVideoStream:
 		self.frame = None
 		self.frames = JoinableQueue(maxsize = 75)
 		self.stopped = False
-	def start(self, event):
+	def start(self, goodEvent, badEvent):
 		# start the thread to read frames from the video stream
-		t = Thread(target=self.update, args=(event,))
+		t = Thread(target=self.update, args=(goodEvent, badEvent))
 		t.daemon = True
 		t.start()
 		self.worker = Process(target=self.save, args=())
@@ -88,7 +92,7 @@ class PiVideoStream:
 			if frameCount % 500 == 0:
 				os.system("echo 1 > /proc/sys/vm/drop_caches")
 			self.frames.task_done()
-	def update(self, event):
+	def update(self, goodEvent, badEvent):
 		# keep looping infinitely until the thread is stopped
 		"""
 		while True:
@@ -119,9 +123,9 @@ class PiVideoStream:
 				self.worker2.terminate()
 				self.frames = JoinableQueue()
 				self.frames.close()
-				event.set()
+				badEvent.set()
 				print("fired event")
-			if event.isSet():
+			if goodEvent.isSet() or badEvent.isSet():
 				self.stream.close()
 				self.rawCapture.close()
 				self.camera.close()
