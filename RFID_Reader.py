@@ -9,7 +9,7 @@ import signal
 import RPi.GPIO as GPIO
 import datetime
 from random import shuffle
-from picamera import PiCamera
+from picamera import PiCamera, Color
 from picamera.array import PiRGBArray
 from PiVideoStream import PiVideoStream
 #import imutils
@@ -27,6 +27,7 @@ import cv2
 ##    (118, 330), (190, 336), (288, 332), (401, 326), (496, 320), (556, 305)  #3-(1-5) [y-x]
 ##]
 readerMap = [(100, 100),(550, 350), (100, 350), (550, 100)]
+seenTags = []
 #Hex I2C Addresses of all ProTrinkets
 '''
 ProT [0] = 0x11
@@ -112,14 +113,29 @@ def scan(reader, f, readerNum):
     global frameCount, startTime
     mice = []
     try:
+        print("startedWait")
         Data = reader.readTag()
         if f is not False and Data > 0:
-            frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
-            print("pickup")
+            print("got data")
+            if Data not in seenTags:
+                seenTags.append(Data)
+#            f.camera.start_preview()
+            print("added tag")
             try:
-                f.write (str(Data)+";"+str(readerMap[readerNum])+";"+frameName+"\n")
-            except Exception as e:
+                f.camera.annotate_text = str(seenTags.index(Data)) + str(readerNum)
+            except PiCameraValueError as e:
                 print(str(e))
+            print("modded text")
+            f.camera.annotate_text_size = 16
+#            f.camera.annotate_foreground = Color(y = 50*seenTags.index(Data), 50*readerNum, v = 0)
+            time.sleep(0.1)
+ #           frameName = 'tracking_system' + trialName + str(frameCount) + '.jpg'
+            f.camera.annotate_text = ""
+            print("pickup")
+#            try:
+#                f.write (str(Data)+";"+str(readerMap[readerNum])+";"+frameName+"\n")
+    except Exception as e:
+        print(str(e))
     finally:
         return
 
@@ -176,10 +192,10 @@ def record():
     with open (vs.folder + "/RTS_test.txt" , "w") as f:
         startTime = time.time()
  #THreading start stuff
-        thread0 = Process(target=scan, daemon= True, args=(reader0, f, 0,))
-        thread1 = Process(target=scan, daemon= True, args=(reader1, f, 1,))
-        thread2 = Process(target=scan, daemon= True, args=(reader2, f, 2,))
-        thread3 = Process(target=scan, daemon= True, args=(reader3, f, 3,))
+        thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, vs, 0,))
+        thread1 = threading.Thread(target=scan, daemon= True, args=(reader1, vs, 1,))
+        thread2 = threading.Thread(target=scan, daemon= True, args=(reader2, vs, 2,))
+        thread3 = threading.Thread(target=scan, daemon= True, args=(reader3, vs, 3,))
         thread0.start()
         thread1.start()
         thread2.start()
@@ -189,24 +205,24 @@ def record():
         signal.signal(signal.SIGINT, stopHandler)
         while True:
             time.sleep(0.05)
-            frameCount = vs.read()
+#            frameCount = vs.read()
 #           cv2.imshow("Mouse Tracking", frame)
 #           key = cv2.waitKey(1)& 0xFF
             if not thread0.is_alive():
-                thread0 = Process(target=scan, daemon= True, args=(reader0, f, 0))
+                thread0 = threading.Thread(target=scan, daemon= True, args=(reader0, vs, 0))
                 thread0.start()
             if not thread1.is_alive():
-                thread1 = Process(target=scan, daemon= True, args=(reader1, f, 1))
+                thread1 = threading.Thread(target=scan, daemon= True, args=(reader1, vs, 1))
                 thread1.start()
             if not thread2.is_alive():
-                thread2 = Process(target=scan, daemon= True, args=(reader2, f, 2))
+                thread2 = threading.Thread(target=scan, daemon= True, args=(reader2, vs, 2))
                 thread2.start()
             if not thread3.is_alive():
-                thread3 = Process(target=scan, daemon= True, args=(reader3, f, 3))
+                thread3 = threading.Thread(target=scan, daemon= True, args=(reader3, vs, 3))
                 thread3.start()
             if goodEvent.isSet():
                 print('caught event')
-                vs.frames.join()
+#                vs.frames.join()
                 print("done")
                 sys.exit(0)
                # os.system("sudo kill -s 2 $(pgrep raspivid)")

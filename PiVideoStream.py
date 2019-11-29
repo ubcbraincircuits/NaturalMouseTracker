@@ -14,6 +14,7 @@ from multiprocessing import JoinableQueue
 from threading import Thread
 from os import listdir
 import numpy as np
+from func_timeout import func_timeout, FunctionTimedOut
 import os
 import sys
 import cv2
@@ -28,7 +29,7 @@ class PiVideoStream:
 		self.camera.resolution = resolution
 		resolution = self.camera.resolution
 		self.camera.exposure_mode = "off"
-		self.camera.color_effects = (128,128)
+#		self.camera.color_effects = (128,128)
 		self.camera.framerate = framerate
 		self.lastTime = 0.0
 		self.frameCount = 0
@@ -52,10 +53,11 @@ class PiVideoStream:
 				os.mkdir(self.folder+'_'+str(count))
                 self.folder=self.folder+'_'+str(count)
                '''
-#		self.camera.start_recording(self.folder + '/tracking_system' + self.trialName + ".h264", quality=1)
+		self.camera.start_recording(self.folder + '/tracking_system' + self.trialName + ".h264")
+		self.camera.start_preview()
 		self.rawCapture = PiRGBArray(self.camera, size=resolution)
-		self.stream = self.camera.capture_continuous(self.rawCapture,
-			format="bgr", use_video_port=True)
+#		self.stream = self.camera.capture_continuous(self.rawCapture,
+#			format="bgr", use_video_port=True)
 #		self.hdf5 = None
 #		self.frameStore = None
 		# initialize the frame and the variable used to indicate
@@ -67,16 +69,16 @@ class PiVideoStream:
 		# start the thread to read frames from the video stream
 		t = Thread(target=self.update, args=(goodEvent, badEvent))
 		t.daemon = True
-		t.start()
+#		t.start()
 		self.worker = Process(target=self.save, args=())
 		self.worker.daemon = True
-		self.worker.start()
+#		self.worker.start()
 		self.worker1 = Process(target=self.save, args=())
 		self.worker1.daemon = True
-		self.worker1.start()
+#		self.worker1.start()
 		self.worker2 = Process(target=self.save, args=())
 		self.worker2.daemon = True
-		self.worker2.start()
+#		self.worker2.start()
 		print("started")
 		return self
 	def save(self):
@@ -122,6 +124,7 @@ class PiVideoStream:
 				self.worker1.terminate()
 				self.worker2.terminate()
 				self.frames.close()
+#				import pdb; pdb.set_trace()
 				badEvent.set()
 				print("fired event")
 			if goodEvent.isSet() or badEvent.isSet():
