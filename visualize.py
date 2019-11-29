@@ -22,7 +22,9 @@ def convertBack(x, y, w, h):
 
 
 def createVideo(tag, datum, fourcc, dataDrive, dataPath, frames, trackProgress):
-
+    global trialName
+    if not frames:
+        cap = cv2.VideoCapture(dataDrive + dataPath + "tracking_system" + trialName + '.h264')
     table = np.array([((i/255.0) ** 0.75)*255 #0.7 to 0.9 seems like a good range.
         for i in np.arange(0, 256)]).astype('uint8')
     frameCount = 1
@@ -87,18 +89,8 @@ def createVideo(tag, datum, fourcc, dataDrive, dataPath, frames, trackProgress):
     video.release()
     file.close()
 
-if __name__ == "__main__":
-    trialName = "base_tracking"
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-n", "--name", help="Name of the frame folder/text file")
-    ap.add_argument("-d", "--drive", help="Path to data")
-    ap.add_argument("-f", "--frames", help="Include this argument if you have individual frame files")
-    args = vars(ap.parse_args())
-    dataPath = args.get("name")
-    dataDrive = args.get("drive", "frameData")
-    frames = False
-    if args.get("frames", None) is not None:
-        frames = True
+
+def run(dataDrive, dataPath, frames=False):
     darkFile = open(dataDrive + dataPath + "/processed.json", "r")
     darkData = json.loads(darkFile.read())
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # 'x264' doesn't work
@@ -121,3 +113,17 @@ if __name__ == "__main__":
     for process in processes:
         process.join()
     cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    trialName = "base_tracking"
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-n", "--name", help="Name of the frame folder/text file")
+    ap.add_argument("-d", "--drive", help="Path to data")
+    ap.add_argument("-f", "--frames", help="Include this argument if you have individual frame files")
+    args = vars(ap.parse_args())
+    dataPath = args.get("name")
+    dataDrive = args.get("drive", "frameData")
+    frames = False
+    if args.get("frames", None) is not None:
+        frames = True
+    run(dataDrive, dataPath, frames=frames)

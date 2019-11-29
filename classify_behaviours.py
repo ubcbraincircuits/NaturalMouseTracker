@@ -2,7 +2,8 @@ import json
 import numpy as np
 import math
 import argparse
-from contextlib import ExitStack
+import pymysql
+import getpass
 import re
 
 
@@ -71,12 +72,30 @@ group_radius = 120
 social_radius = 150
 velocity_thresh = 5
 
+
 def convertBack(x, y, w, h):
     xmin = int(round(x - (w / 2)))
     xmax = int(round(x + (w / 2)))
     ymin = int(round(y - (h / 2)))
     ymax = int(round(y + (h / 2)))
     return xmin, ymin, xmax, ymax
+
+
+def saveData(arr, SQL, csv, table):
+    # print('save', arr)
+    for val in arr:
+        if val != "\n":
+            csv.write(str(val) + ',')
+            if len(SQL[table]) > 0:
+                SQL[table][len(SQL[table]) - 1].append(val)
+            else:
+                SQL[table].append([val])
+        else:
+            csv.write(str(val))
+            SQL['main'].append([])
+            SQL['behaviour'].append([])
+            SQL['position'].append([])
+            SQL['pose'].append([])
 
 
 ap = argparse.ArgumentParser()
@@ -116,12 +135,12 @@ while True:
                             datum[i][1]*720/640, 0, 0
                     xmin, ymin, xmax, ymax = convertBack(
                         float(x), float(y), float(w), float(h))
-                    #head_pos = (datum[i][6], datum[i][7])
-                    #tail_pos = (datum[i][8], datum[i][9])
-                    center = (x, y)
-                    #pt1 = (xmin, ymin)
-                    #pt2 = (xmax, ymax)
-                    pos = [center, w, h] #head_pos, #tail_pos]
+                    # head_pos = (datum[i][6], datum[i][7])
+                    # tail_pos = (datum[i][8], datum[i][9])
+                    center = (float(x), float(y))
+                    # pt1 = (xmin, ymin)
+                    # pt2 = (xmax, ymax)
+                    pos = [center, float(w), float(h)] # head_pos, #tail_pos]
                     mouseDict[tag].append(pos)
                     lastFrameDict[tag] =i
                     break
@@ -135,31 +154,49 @@ while True:
 velocities = {}
 approaches = {}
 files = {}
+SQL = {}
 for tag in mouseDict.keys():
     velocities.update({tag: None})
     approaches.update({tag: []})
     files.update({tag: dataDrive + dataPath + "/classified_" + tag + ".csv"})
+    SQL.update({tag: {'main': [], 'behaviour': [], 'position': [], 'pose': []}})
 twoGroupFormingFrames = []
 twoGroupLeavingFrames = []
 threeGroupFormingFrames = []
 threeGroupLeavingFrames = []
 lastGroup = set()
 date, timestamp = dataPath.split('_')
+
+password = getpass.getpass(prompt="Please enter the password for the database")
+db = pymysql.connect(host="142.103.107.236", user="slavePi", db="tracking_behaviour", password=password)
+cur = db.cursor()
+main_save_query = """INSERT INTO `MiceEvents` (`Tag`, `Date`, `Time`,
+`Behaviour`, `Position`, `Pose`) VALUES(%s,%s,%s,%s,%s,%s)"""
+behaviour_save_query = """INSERT INTO `Behaviours` (`Name`, `Others`,
+    `Location`) VALUES(%s,%s,%s)"""
+position_save_query = """INSERT INTO `Positions` (`Center_x`, `Center_y`,
+    `Width`, `Height`, `V_x`, `V_y`, `Speed`)
+    VALUES(%s,%s,%s,%s,%s,%s,%s)"""
+pose_save_query = """INSERT INTO `Pose` (`Head_x`, `Head_y`,
+    `Tail_x`, `Tail_y`, `LeftEar_x`, `LeftEar_y`,
+    `RightEar_x`, `RightEar_y`) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
 for tag, name in files.items():
     files[tag] = open(name, 'w')
-    files[tag].write("Date,Time,Behaviour,Others_Involved,Location," + \
-                        "Center_x,Center_y,Width," + \
-                        "Height,Head_x,Head_y,Tail_x,Tail_y," + \
-                        "L_Ear_x,L_Ear_y,R_Ear_x,R_Ear_y," + \
+    files[tag].write("Tag,Date,Time,Behaviour,Others_Involved,Location,"
+                        "Center_x,Center_y,Width,"
+                        "Height,Head_x,Head_y,Tail_x,Tail_y,"
+                        "L_Ear_x,L_Ear_y,R_Ear_x,R_Ear_y,"
                         "Velocity_x,Velocity_y,Speed,\n")
+
 for i in range(0, totalFrames): #Iterate over all frames
 
     group = set()
     print(i)
     for mouse, positions in mouseDict.items():
         behaviourAssigned = False
+        saveData([mouse, date, timestamp + '-' + str(i).zfill(5)], SQL[mouse], files[mouse], 'main')
         if len(positions) <= i:
-            files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Nesting\n")
+            saveData(['Nesting', '\n'], SQL[mouse], files[mouse], 'behaviour')
             break
         if i >= 1 and positions[i-1] is not None and positions[i] is not None: #If we have atleast 1 detection and it is not the first
             velocities.update({mouse:(positions[i][0][0] - positions[i-1][0][0],
@@ -184,85 +221,122 @@ for i in range(0, totalFrames): #Iterate over all frames
                         if len(approaches[mouse]) == 0 or  approaches[mouse][-1][0] < i -10:
                             approaches[mouse].append((i, other))
                             behaviourAssigned = True
-                            files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Approaching,"+str(other) + ",")
+                            saveData(['Approaching', other],SQL[mouse], files[mouse], 'behaviour')
         if mouse in group:
             behaviourAssigned = True
             if mouse not in lastGroup:
-                files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",GroupEntering,")
+                saveData(['GroupEntering'], SQL[mouse], files[mouse], 'behaviour')
             else:
                 if velocities[mouse] and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > velocity_thresh:
-                    files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Grouping,")
+                    saveData(['Grouping'], SQL[mouse], files[mouse], 'behaviour')
                 else:
-                    files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Nesting,")
+                    saveData(['Nesting'], SQL[mouse], files[mouse], 'behaviour')
             writeStr = " "
             for other in group:
                 if other != mouse:
                     writeStr += other + ';'
-            files[mouse].write(writeStr[:-1] + ',')
+            saveData([writeStr[:-1]], SQL[mouse], files[mouse], 'behaviour')
         else:
             if mouse in lastGroup:
-                files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",GroupLeaving,")
+                saveData(['GroupLeaving'], SQL[mouse], files[mouse], 'behaviour')
                 behaviourAssigned = True
                 writeStr = " "
                 for other in lastGroup:
                     if other != mouse:
                         writeStr += other + ';'
-                files[mouse].write(writeStr[:-1] + ',')
+                saveData([writeStr[:-1]], SQL[mouse], files[mouse], 'behaviour')
 
         if not behaviourAssigned:
             if velocities[mouse] and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > velocity_thresh:
-                files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Exploring,")
+                saveData(["Exploring"], SQL[mouse], files[mouse], 'behaviour')
             elif positions[i] is None:
                 if (i > 5 and positions[i -5] is None) or (i < totalFrames - 6 and positions[i+5] is None):
-                    files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Nesting,")
+                    saveData(["Nesting"], SQL[mouse], files[mouse], 'behaviour')
                 else:
-                    files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Untracked,")
+                    saveData(["Untracked"], SQL[mouse], files[mouse], 'behaviour')
             else:
-                files[mouse].write(date + ',' + timestamp + '-' + str(i) + ",Stationary,")
-            files[mouse].write("NULL,")
+                saveData(["Stationary"], SQL[mouse], files[mouse], 'behaviour')
+            # No other mouse involved
+            saveData(["NULL"], SQL[mouse], files[mouse], 'behaviour')
+
         if positions[i] is not None:
             x, y = positions[i][0]
             if x > 912*3/4 or x < 912*1/4:
                 if y > 720*3/4 or y < 720*1/4:
-                    files[mouse].write("Corner,")
+                    saveData(["Corner"], SQL[mouse], files[mouse], "behaviour")
                 else:
-                    files[mouse].write("Wall,")
+                    saveData(["Wall"], SQL[mouse], files[mouse], "behaviour")
             elif y > 912*3/4 or y < 912*1/4:
-                files[mouse].write("Wall,")
+                saveData(["Wall"], SQL[mouse], files[mouse], "behaviour")
             else:
-                files[mouse].write("Center,")
+                saveData(["Center"], SQL[mouse], files[mouse], "behaviour")
             count = 0
+            table = 'position'
             for aspect in positions[i]:
-                count += 1
-                files[mouse].write(re.sub('[^A-Za-z0-9,.]+', '', str(aspect)) + ",")
-            while count < 11:  # Number of potential positions (i.e head, tail)
-                files[mouse].write('NULL,')
+                if count >= 4:
+                    table = "pose"
+                if type(aspect).__name__ == 'tuple':
+                    for num in aspect:
+                        count += 1
+                        saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(num)))], SQL[mouse], files[mouse], table)
+                else:
+                    count += 1
+                    saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(aspect)))], SQL[mouse], files[mouse], table)
+            while count < 12:  # Number of potential positions (i.e head, tail)
+                if count >= 4:
+                    table = "pose"
+                saveData([0], SQL[mouse], files[mouse], table)
                 count += 1
         else:
+            # No Location
+            saveData(["NULL"], SQL[mouse], files[mouse], "behaviour")
+            table = 'position'
             count = 0
-            while count < 13:  # Number of potential positions (i.e head, tail)
-                files[mouse].write('NULL,')
+            while count < 12:  # Number of potential positions (i.e head, tail)
+                if count >= 4:
+                    table = "pose"
+                saveData([0], SQL[mouse], files[mouse], table)
                 count += 1
         if velocities[mouse] is not None:
             x, y = velocities[mouse]
             speed = np.sqrt(x**2 + y**2)
-            files[mouse].write(str(x) + ',' + str(y) + "," + str(speed) + ',')
+            saveData([float(x), float(y), float(speed)], SQL[mouse], files[mouse], 'position')
         else:
-            files[mouse].write('0,0,0,')
-        files[mouse].write("\n")
+            saveData([0, 0, 0], SQL[mouse], files[mouse], 'position')
+        saveData(['\n'], SQL[mouse], files[mouse], '')
+
     if len(group) == 2 and len(lastGroup) < 2:
         twoGroupFormingFrames.append(i)
     if len(group) == 3 and len(lastGroup) < 3:
         threeGroupFormingFrames.append(i)
     if len(group) < 3 and len(lastGroup) == 3:
         threeGroupLeavingFrames.append(i)
-    if len(group) < 2 and len(lastGroup) ==2 :
+    if len(group) < 2 and len(lastGroup) == 2:
         twoGroupLeavingFrames.append(i)
     lastGroup = group
 
 for file in files.values():
     file.close()
-
+for tag, data in SQL.items():
+        for i in range(0, len(data['main']) -1):
+            if i % 100 == 0:
+                print(i)
+            try:
+                cur.execute(pose_save_query, data['pose'][i])
+                pose_id = cur.lastrowid
+                # print('pose done')
+                cur.execute(position_save_query, data['position'][i])
+                position_id = cur.lastrowid
+                # print('position done')
+                cur.execute(behaviour_save_query, data['behaviour'][i])
+                # print('behaviour done')
+                behaviour_id = cur.lastrowid
+                cur.execute(main_save_query, data['main'][i] + [behaviour_id, position_id, pose_id])
+            except pymysql.Error as e:
+                pass
+                # print(str(e))
+        db.commit()
+db.close()
 print("two - Entering:", len(twoGroupFormingFrames),  "- Leaving:",  len(twoGroupLeavingFrames))
 print("three - Entering:", len(threeGroupFormingFrames), "- Leaving:",  len(threeGroupLeavingFrames))
 print(approaches)
