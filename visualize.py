@@ -65,8 +65,8 @@ def createVideo(tag, datum, fourcc, dataDrive, dataPath, frames, trackProgress):
                     x, y = z[0]*912/640, z[1]*720/640
                     xmin, ymin, xmax, ymax = convertBack(
                         float(x), float(y), float(w), float(h))
-                    pt1 = (xmin, ymin)
-                    pt2 = (xmax, ymax)
+                    pt1 = (max(xmin-20, 0), max(ymin-20, 0))
+                    pt2 = (min(xmax +20, 912), min(ymax + 20, 720))
                     blank_image = np.ones((720,912,3), np.uint8)*255
                     blank_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] = frame_rgb[pt1[1]:pt2[1], pt1[0]:pt2[0]]
                     video.write(blank_image)

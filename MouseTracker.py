@@ -10,6 +10,7 @@ import cv2
 class MouseTracker:
     totalAllowedVis = 8
     kVelocityDiff = 0.01
+    kHistogramDiff = 0.5
 
     def __init__(self, startCoord, id, frame = '', frameCount = 0, width = 0, height = 0):
         self.currCoord = startCoord
@@ -23,62 +24,28 @@ class MouseTracker:
             self.recordedPositions = [startCoord]
         else:
             self.recordedPositions = []
+            self.lastPos = None
         self.visualTracker = None
         self.visualCount = 0
         self.canDoVisual = False
         self.validatedIndex = 0
         self.id = id
-        self.filter = KalmanFilter
+        self.histogram = None
         self.lastFrameCount = 0
         self.velocity = (0,0)
 
-    def updatePosition(self, coordinate, frame='', frameCount = 0, width = 0, height = 0, miceNum = 1):
+    def updatePosition(self, coordinate, frame='', frameCount = 0, width = 0, height = 0):
         self.currCoord = coordinate
         coordinate.append(frame)
         coordinate.append(frameCount)
         coordinate.append(width)
         coordinate.append(height)
-        coordinate.append(miceNum)
         if (frameCount - self.lastFrameCount) > 5:
             self.lastPos = None
         self.lastFrameCount = frameCount
         self.recordedPositions.append(coordinate)
         if len(self.recordedPositions) > 10:
             self.canDoVisual = True
-        """
-        TODO: Kalman Filter.
-        Initial state covariance to be determined - depends on mouse speed and
-        other factors.
-        From mouse movement data, state covariance matrix P:
-        x      [[350000 0       0       0       0       0       ]
-        x_dot   [0      7000    0       0       0       0       ]
-        x_ddot  [0      0       2700000 0       0       0       ]
-        y       [0      0       0       350000  0       0       ]
-        y_dot   [0      0       0       0       16470   0       ]
-        y_ddot  [0      0       0       0       0       2000000 ]]
-
-        Should use a constant acceleration model, so state transition function
-        should be F = [ [1  del_t   1/2 del_t^2 0   0       0]
-                    [0  1       del_t       0   0       0]
-                    [0  0       1           0   0       0]
-                    [0  0       0           1   del_t   1/2 del_t^2]
-                    [0  0       0           0   1       del_t]
-                    [0  0       0           0   0       1] ]
-
-        Process Noise - use general white noise, call variance q
-        q = 5000
-
-        Measurement function - we only measure position, so it is simply
-        H = [[1 0 0 0 0 0]
-             [0 0 0 1 0 0]]
-        Measurement noise matrix:
-        Variances determined by experimental data:
-        R = [[330 52  ]
-             [52   231]]
-
-        Use this to update velocity, which will be used to provide a secondary metric
-        for detection assignment.
-        """
         if self.lastPos:
             self.velocity = ((coordinate[0] - self.lastPos[0]), (coordinate[1] - self.lastPos[1]))
         else:
@@ -88,6 +55,23 @@ class MouseTracker:
             self.visualCount += 1
             if self.visualCount > MouseTracker.totalAllowedVis:
                 self.stopVisualTracking()
+
+    def updateHistogram(self, image, pos=False, save=True):
+        if not pos:
+            x, y, _, _, w, h, = self.currCoord
+        else:
+            x,y,w,h = pos
+        xmin = int(round(x - (w / 2)))
+        xmax = int(round(x + (w / 2)))
+        ymin = int(round(y - (h / 2)))
+        ymax = int(round(y + (h / 2)))
+        image = image[ymin:ymax, xmin:xmax]
+        hist = cv2.calcHist([image], [0], None, [16],
+		      [0, 256])
+        hist = cv2.normalize(hist, hist).flatten()
+        if save:
+            self.histogram = hist
+        return hist
 
     def startVisualTracking(self, frame):
         self.visualTracker = cv2.TrackerCSRT_create()
@@ -128,6 +112,7 @@ class MouseTracker:
            self.currCoord = self.recordedPositions[self.validatedIndex]
 
     def trimPositions(self, frameCount = 0):
+        index = None
         for rec in self.recordedPositions:
             if rec[3] >= frameCount:
                 index = self.recordedPositions.index(rec)
@@ -179,11 +164,15 @@ class MouseTracker:
             union = posArea + selfArea - intersection
             return intersection/union
 
-    def trackLikelihood (self, pos):
+    def trackLikelihood (self, pos, image):
         IOU = self.intersectionOverUnion(pos)
-        new_vel = (self.currCoord[0] - pos[0], self.currCoord[1] - pos[1])
+        new_vel = (pos[0] - self.currCoord[0], pos[1] - self.currCoord[1])
         del_vel = np.sqrt((new_vel[0] - self.velocity[0])**2 +
                     (new_vel[1] - self.velocity[1])**2)
+        # print(self.id, 'old:', self.velocity, 'new', new_vel, 'delta', del_vel)
+        # new_hist = self.updateHistogram(image, pos=pos, save=False)
+        # del_hist = cv2.compareHist(new_hist, self.histogram, cv2.HISTCMP_BHATTACHARYYA)
+        # print(del_hist)
         return IOU - MouseTracker.kVelocityDiff*del_vel
 
     def tag(self):
