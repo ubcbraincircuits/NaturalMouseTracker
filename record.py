@@ -1,4 +1,5 @@
 import io
+import ctypes as ct
 import os
 import datetime as dt
 from threading import Thread, Lock
@@ -142,9 +143,17 @@ def main(output_filename):
 #    print(camera.outputs[0])
     camera.outputs[0].framesize = (912, 720)
     camera.outputs[0].framerate = 15
-    camera.outputs[0].commit()
     mp = camera.control.params[mmal.MMAL_PARAMETER_EXPOSURE_MODE]
     mp.value = mmal.MMAL_PARAM_EXPOSUREMODE_OFF
+    camera.control.params[mmal.MMAL_PARAMETER_EXPOSURE_MODE] = mp
+    mp = mmal.MMAL_PARAMETER_COLOURFX_T(
+            mmal.MMAL_PARAMETER_HEADER_T(
+                mmal.MMAL_PARAMETER_COLOUR_EFFECT,
+                ct.sizeof(mmal.MMAL_PARAMETER_COLOURFX_T)
+                ),
+            mmal.MMAL_TRUE, 128, 128
+            )
+    camera.control.params[mmal.MMAL_PARAMETER_COLOUR_EFFECT] = mp
     camera.outputs[0].commit()
 
     # Configure H.264 encoder
