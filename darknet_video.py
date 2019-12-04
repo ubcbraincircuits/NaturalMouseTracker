@@ -15,7 +15,7 @@ import json
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from skimage import color
-from ImageProcessing import cvDrawBoxes
+#from ImageProcessing import cvDrawBoxes
 import argparse
 import itertools
 from munkres import Munkres
@@ -23,6 +23,7 @@ from tqdm import tqdm
 from shutil import copyfile
 from readEncoding import decode
 from MouseTracker import MouseTracker
+
 
 def convertBack(x, y, w, h):
     xmin = int(round(x - (w / 2)))
@@ -73,8 +74,8 @@ def cvDrawBoxes(detections, img, mice):
                     " [" + str(round(detection[1] * 100, 2)) + "]",
                     (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     [0, 255, 0], 2)
-
     return img
+
 
 netMain = None
 metaMain = None
