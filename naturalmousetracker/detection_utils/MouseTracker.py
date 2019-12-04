@@ -33,6 +33,7 @@ class MouseTracker:
         self.histogram = None
         self.lastFrameCount = 0
         self.velocity = (0,0)
+        self.lostCounter= -1
 
     def updatePosition(self, coordinate, frame='', frameCount = 0, width = 0, height = 0):
         self.currCoord = coordinate
@@ -91,6 +92,7 @@ class MouseTracker:
         self.visualCount = 0
         if delete:
             self.trimPositions(self.visualStartPoint[3])
+            self.canDoVisual = False
         else:
             self.canDoVisual = True
 

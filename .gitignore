@@ -2,3 +2,9 @@
 darknet/*
 __pycache__/*
 *.avi
+*.weights
+*.dll
+*/__pycache__/*
+*/*/__pycache__/*
+build/*
+dist/*

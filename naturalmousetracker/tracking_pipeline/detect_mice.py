@@ -10,20 +10,24 @@ import os
 import cv2
 import numpy as np
 import time
-import darknet
+from naturalmousetracker.detection_utils import darknet
 import json
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
-from skimage import color
+try:
+    import importlib.resources as pkg_resources
+except ImportError:
+    # Try backported to PY<37 `importlib_resources`.
+    import importlib_resources as pkg_resources
+from naturalmousetracker import data
 #from ImageProcessing import cvDrawBoxes
 import argparse
 import itertools
 from munkres import Munkres
 from tqdm import tqdm
 from shutil import copyfile
-from readEncoding import decode
-from MouseTracker import MouseTracker
-
+from naturalmousetracker.detection_utils.readEncoding import decode
+from naturalmousetracker.detection_utils.MouseTracker import MouseTracker
 
 def convertBack(x, y, w, h):
     xmin = int(round(x - (w / 2)))
@@ -74,15 +78,16 @@ def cvDrawBoxes(detections, img, mice):
                     " [" + str(round(detection[1] * 100, 2)) + "]",
                     (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     [0, 255, 0], 2)
-    return img
 
+    return img
 
 netMain = None
 metaMain = None
-altNames = None
-readerMap = [(100, 350), (550, 350), (100, 100), (550, 100)]
+altNames = ["mouse"]
+readerMap = [[100, 350], [550, 350], [100, 100], [550, 100]]
+readerMap = [[550, 350], [100, 100], [550, 100], [100, 350]]
 entranceX = 550
-entranceY = 350
+entranceY = 300
 maxSwapDistance = 100
 minSwapIOU = 0.2
 
@@ -100,50 +105,52 @@ def YOLO(trialName, mice, RFID, showVideo):
     miceNum = len(mice)
     global dataPath, dataDrive, useFrames, verbose, tags
     global metaMain, netMain, altNames
-    configPath = "./yolo-obj.cfg"
-    weightPath = "./yolo-obj_new.weights"
-    metaPath = "./data/obj.data"
-    if not os.path.exists(configPath):
-        raise ValueError("Invalid config path `" +
-                         os.path.abspath(configPath)+"`")
-    if not os.path.exists(weightPath):
-        raise ValueError("Invalid weight path `" +
-                         os.path.abspath(weightPath)+"`")
-    if not os.path.exists(metaPath):
-        raise ValueError("Invalid data file path `" +
-                         os.path.abspath(metaPath)+"`")
-    if netMain is None:
-        netMain = darknet.load_net_custom(configPath.encode(
-            "ascii"), weightPath.encode("ascii"), 0, 1)  # batch size = 1
-    if metaMain is None:
-        metaMain = darknet.load_meta(metaPath.encode("ascii"))
-    if altNames is None:
-        try:
-            with open(metaPath) as metaFH:
-                metaContents = metaFH.read()
-                import re
-                match = re.search("names *= *(.*)$", metaContents,
-                                  re.IGNORECASE | re.MULTILINE)
-                if match:
-                    result = match.group(1)
-                else:
-                    result = None
-                try:
-                    if os.path.exists(result):
-                        with open(result) as namesFH:
-                            namesList = namesFH.read().strip().split("\n")
-                            altNames = [x.strip() for x in namesList]
-                except TypeError:
-                    pass
-        except Exception:
-            pass
-    printCheck("Starting the YOLO loop...")
+    with pkg_resources.path(data, 'yolo-obj.cfg') as configPath, pkg_resources.path(data, 'yolo-obj_best.weights') as weightPath, pkg_resources.path(data, 'obj.data') as metaPath:
+        if not os.path.exists(configPath.absolute()):
+            raise ValueError("Invalid config path `" +
+                             os.path.abspath(configPath.absolute())+"`")
+        if not os.path.exists(weightPath.absolute()):
+            raise ValueError("Invalid weight path `" +
+                             os.path.abspath(weightPath.absolute())+"`")
+        if not os.path.exists(metaPath.absolute()):
+            raise ValueError("Invalid data file path `" +
+                             os.path.abspath(metaPath.absolute())+"`")
+        configPath = str(configPath.absolute())
+        weightPath = str(weightPath.absolute())
+        metaPath = str(metaPath.absolute())
+        if netMain is None:
+            netMain = darknet.load_net_custom(configPath.encode(
+                "ascii"), weightPath.encode("ascii"), 0, 1)  # batch size = 1
+        print("loading meta")
+        if metaMain is None:
+            metaMain = darknet.load_meta(metaPath.encode("ascii"))
+        if altNames is None:
+            try:
+                with open(metaPath) as metaFH:
+                    metaContents = metaFH.read()
+                    import re
+                    match = re.search("names *= *(.*)$", metaContents,
+                                      re.IGNORECASE | re.MULTILINE)
+                    if match:
+                        result = match.group(1)
+                    else:
+                        result = None
+                    try:
+                        if os.path.exists(result):
+                            with open(result) as namesFH:
+                                namesList = namesFH.read().strip().split("\n")
+                                altNames = [x.strip() for x in namesList]
+                    except TypeError:
+                        pass
+            except Exception:
+                pass
+        printCheck("Starting the YOLO loop...")
 
     # Create an image we reuse for each detect
     darknet_image = darknet.make_image(darknet.network_width(netMain),
                                     darknet.network_height(netMain),3)
     if not useFrames:
-        cap = cv2.VideoCapture(dataDrive + dataPath + "/tracking_system" + trialName + ".h264")
+        cap = cv2.VideoCapture(dataDrive + dataPath + "/tracking.h264")
     frameCount = 1
     """
     Problem: Mice disappear and then reappear while others are unidentified. They should be instantly identified but are not.
@@ -171,7 +178,7 @@ def YOLO(trialName, mice, RFID, showVideo):
         RFIDIndices = []
         try:
             validationFrame = False
-            # frameName = dataDrive + dataPath + "/tracking_system" + trialName + str(frameCount) + ".jpg"
+            frameName = dataDrive + dataPath + "/tracking_system" + trialName + str(frameCount) + ".jpg"
             # while dataDrive + dataPath + "/" + RFID[lastRFIDIndex + 1].split(';')[2].strip('\n') == frameName:
             #     RFIDIndices.append(lastRFIDIndex + 1)
             #     validationFrame = True
@@ -185,7 +192,9 @@ def YOLO(trialName, mice, RFID, showVideo):
             if decode(frame_read) != -1:
                 validationFrame = True
                 validationTag, validationReader = decode(frame_read)
+                print(decode(frame_read))
                 validationTag = tags[validationTag]
+                printCheck(validationReader)
                 validationReader = readerMap[validationReader]
             printCheck(frameCount)
             frameCount += 1
@@ -214,6 +223,20 @@ def YOLO(trialName, mice, RFID, showVideo):
 
         cleanedDetections = []
 
+
+        for mouse in partialLostTrackers: #Every frame increment all lostCounters who are not -1
+            if mouse.lostCounter >= 10:
+                if mouse.id > 99999:
+                    lostTrackers.append(mouse)
+                    mouse.lostCounter = -1
+                mice.remove(mouse)
+                partialLostTrackers.remove(mouse)
+
+
+            if mouse.lostCounter >= 0:
+                mouse.lostCounter += 1
+
+
         """
         ========================================Track Assignment=======================================================
         Approach 1: Assign each detection to its nearest mouse.
@@ -240,15 +263,6 @@ def YOLO(trialName, mice, RFID, showVideo):
         ################ MAIN DETECTION ASSIGNMENT #######################
         """
         for mouse, detection in pairs:
-            # mouse = mice[mouseIndex]
-            # if detectionIndex >= len(detections):
-            #     break
-            # detection = detections[detectionIndex]
-            printCheck(mouse.tag())
-            printCheck('IOU', mouse.intersectionOverUnion(detection[2]))
-            printCheck('likelihood', mouse.trackLikelihood(detection[2], frame_resized))
-
-        for mouse, detection in pairs:
             x, y, w, h = detection[2][0],\
                 detection[2][1],\
                 detection[2][2],\
@@ -256,10 +270,13 @@ def YOLO(trialName, mice, RFID, showVideo):
             if mouse.tag() not in updatedTags and detection in detections:
                 updatedTags.append(mouse.tag())
                 if len(partialLostTrackers) == 1 and mouse.tag() == partialLostTrackers[0].tag():
-                    if mouse.intersectionOverUnion(detection[2]) == 0 and x > entranceX and y > entranceY:
+                    if mouse.trackLikelihood(detection[2], frame_resized) < -5:
                         #Likely a new mouse rather than an old one
                         continue
                     partialLostTrackers = []
+                if mouse.trackLikelihood(detection[2], frame_resized) < -5:
+                    #Definitely not the same detection.
+                    continue
                 if mouse.visualTracker is not None:
                     mouse.stopVisualTracking(delete=False)
                 mouse.updatePosition([x, y], frameName, frameCount -1, w, h)
@@ -313,7 +330,6 @@ def YOLO(trialName, mice, RFID, showVideo):
                 if tracker.visualTracker != None:
                     ok, bbox = tracker.visualTracker.update(frame_resized)
                     if ok:
-
                         printCheck('vis')
                         event['visual'].append((frameName, tracker.tag()))
                         tracker.updatePosition([bbox[0] - bbox[2]/2, bbox[1] - bbox[3]/2], frameName, frameCount, bbox[2], bbox[3])
@@ -364,25 +380,44 @@ def YOLO(trialName, mice, RFID, showVideo):
 
         # ================ Partial Lost Emptying =====================
         if len(partialLostTrackers) > 1:
+
             # Lost more than one? Then once it reappears we cannot know which it is.
             # We now require the RFID.
+            pos = partialLostTrackers[1].getPosition()
+            if partialLostTrackers[0].intersectionOverUnion([pos[0], pos[1], pos[4], pos[5]]) > 0 and len(partialLostTrackers) == 2:
+                for tracker in partialLostTrackers:
+                    #printCheck(track.tag(), "partial lost")
+                    event["lost_mouse"].append((frameName, tracker.tag()))
+                    if tracker.tag() > 99999:
+                        # This is not a dummy tracker, we can find it again
+                        lostTrackers.append(tracker)
+                    try:
+                        mice.remove(tracker)
+                    except ValueError:
+                        # for safety idk
+                        pass
+                partialLostTrackers = []
+            elif len(partialLostTrackers) >= 2:
+                for i in range( 0, len(partialLostTrackers)):
 
-            for tracker in partialLostTrackers:
-                #printCheck(track.tag(), "partial lost")
-                event["lost_mouse"].append((frameName, tracker.tag()))
-                if tracker.tag() > 99999:
-                    # This is not a dummy tracker, we can find it again
-                    lostTrackers.append(tracker)
-                try:
-                    mice.remove(tracker)
-                except ValueError:
-                    # for safety idk
-                    pass
-            partialLostTrackers = []
+                    if partialLostTrackers[i].lostCounter == -1:
+                        partialLostTrackers[i].lostCounter = 0
+
+
+                    #if partialLostTrackers[i].lostCounter > 10:
+                    #    partialLostTrackers[i].lostCounter = -1;
+                    #    if partialLostTrackers[i].tag() > 99999:
+                    #        lostTrackers.append(partialLostTrackers[i])
+
+
+
+
+
 
         # ======================================RFID Validation========================================================
             # Check if we can match up a dummy mouse with a tag
         if validationFrame:
+            #printCheck(mouse.tag())
             usedIndex = False
             """
             First iterate through all lost trackers. If the pickup is one of
@@ -396,6 +431,7 @@ def YOLO(trialName, mice, RFID, showVideo):
                     # Ignore this pickup.
                     usedIndex = True
             for tracker in lostTrackers:
+
                 if validationTag == tracker.tag():
                     usedIndex = True
                     # Match!
@@ -448,7 +484,7 @@ def YOLO(trialName, mice, RFID, showVideo):
                 actualMouse = list(filter(lambda x: x.tag() == validationTag, mice))[0]
                 if len(nearestMice) < 1 or nearestMice[0].distanceFromPos(validationReader) > 300:
                     #If nearest mouse is not currently detected. do nothing
-                    break
+                    pass
                 if len(nearestMice) < 2 or abs(nearestMice[0].distanceFromPos(validationReader) - nearestMice[1].distanceFromPos(validationReader)) > maxSwapDistance:
                     #IDENTITY SWAP
                     if nearestMice[0].tag() != validationTag:
@@ -544,24 +580,26 @@ def scrapeText(RTS):
             taglist.append(int(row))
     return taglist
 
-def run(dataDrive, dataPath, showVid=False, frames=False):
+def run(drive, path, showVid=False, frames=False, verb=False):
+    mouseTrackers = []
+    global dataPath, dataDrive, useFrames, verbose, tags
+    dataDrive = drive
+    dataPath = path
     showVideo=showVid
     useFrames=frames
-    mouseTrackers = []
-    tags = tuple(int(x.strip()) for x in input("Please input the mouse tags, separated by commas").split(','))
-    print(tags)
-    for tag in tags:
-        mouseTrackers.append(MouseTracker([0, 0], tag))
-    RFIDResponses = []
+    verbose=verb
     if dataDrive  == "frameData":
         dataFileName = "RTS_test"
         dataFileName += args.get("name", "") + ".txt"
     else:
         dataFileName = dataDrive + dataPath + "/RTS_test.txt"
+    tags = scrapeText(dataFileName)
+    printCheck(tags)
+    for tag in tags:
+        mouseTrackers.append(MouseTracker([0, 0], tag))
     file = open(dataFileName, "r")
     RFIDResponses = file.readlines()
-    YOLO("base_tracking", mouseTrackers, RFIDResponses, showVideo)
-
+    YOLO("base_tracking", mouseTrackers, [], showVideo)
 
 
 if __name__ == "__main__":
@@ -581,20 +619,6 @@ if __name__ == "__main__":
         useFrames = True
     if args.get("log", None) is not None:
         verbose = True
-    mouseTrackers = []
-    # tags = tuple(int(x.strip()) for x in input("Please input the mouse tags, separated by commas").split(','))
-    RFIDResponses = []
     dataPath = args.get("name", "")
     dataDrive = args.get("drive", "frameData")
-    if dataDrive  == "frameData":
-        dataFileName = "RTS_test"
-        dataFileName += args.get("name", "") + ".txt"
-    else:
-        dataFileName = dataDrive + dataPath + "/RTS_test.txt"
-    tags = scrapeText(dataFileName)
-    printCheck(tags)
-    for tag in tags:
-        mouseTrackers.append(MouseTracker([0, 0], tag))
-    file = open(dataFileName, "r")
-    RFIDResponses = file.readlines()
-    YOLO("base_tracking", mouseTrackers, RFIDResponses, showVideo)
+    run(dataDrive, dataPath, showVideo, useFrames, verbose)

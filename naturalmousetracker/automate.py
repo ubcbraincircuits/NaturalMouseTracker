@@ -3,8 +3,8 @@ import re
 import os
 import sys
 import argparse
-import darknet_video
-import visualize
+import naturalmousetracker.tracking_pipeline.detect_mice as detect_mice
+import naturalmousetracker.tracking_pipeline.crop_videos as crop_videos
 
 '''
 This program automates the mousetrackingsystem pipeline
@@ -21,10 +21,10 @@ def isTimeStamp(folder_name):
     return False
 
 #Check every folder in dir search for processed.json and videos folder. Different actions depending which is found
-def main():
+def main(dir, dataPath, fullPath):
     print("Dir=", dir)
     print("DataDrive=", dataDrive)
-    print("fullPAth=", fullPath)
+    print("fullPath=", fullPath)
 
     for folder in os.listdir(fullPath):
         print(folder)
@@ -34,12 +34,12 @@ def main():
                     if ('videos' in os.listdir(fullPath+"/"+folder)):
                         print("both json and videos folder found, nothing to do here") #If both are present do nothing
                     else:
-                        print("no videos found but json present, run visualize here")
-                        visualize.run(dataDrive, dir)
+                        print("no videos found but json present, run crop_videos here")
+                        crop_videos.run(dataDrive, dir)
 
             else:
                 print("no json found in folder run darknet",folder)
-                darknet_video.run(dataDrive, dir)
+                detect_mice.run(dataDrive, dir)
         else:
             print(folder, "Not a timestamp, nothing to do")
 
@@ -63,4 +63,4 @@ if __name__ == '__main__':
         dataDrive = sys.argv[1]
         fullPath = dataDrive + "/" + dir
 
-    main()
+    main(dir, dataDrive, fullPath)

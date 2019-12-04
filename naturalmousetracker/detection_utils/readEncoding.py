@@ -26,16 +26,16 @@ def parseCodeBlock(frameArray, start, end):
     Takes in frame array, returns the integer representation of mouse tag
     encoded in block two of the array,else return nothing
     """
-    if frameArray[0][start:end].mean() in range(0, 21):
+    if int(frameArray[0][start:end].mean()) in range(0, 21):
         return 0  # Mouse/Reader 0
 
-    if frameArray[0][start:end].mean() in range(70, 96):
+    if int(frameArray[0][start:end].mean()) in range(70, 96):
         return 1  # Mouse/Reader 1
 
-    if frameArray[0][start:end].mean() in range(155, 186):
+    if int(frameArray[0][start:end].mean()) in range(155, 186):
         return 2  # Mouse/Reader 2
 
-    if frameArray[0][start:end].mean() in range(240, 256):
+    if int(frameArray[0][start:end].mean()) in range(240, 256):
         return 3  # Mouse/Reader 3
     return -1
 
@@ -50,7 +50,7 @@ def decode(frameArray):
     if not parseKeyBlock(frameArray):
         return -1  # no pick up on this frame
     else:
-        return (parseCodeBlock(frameArray, 10, 20), parseCodeBlock(frameArray, 20, 30))
+        return [parseCodeBlock(frameArray, 10, 20), parseCodeBlock(frameArray, 20, 30)]
 
 
 if __name__ == "__main__":
