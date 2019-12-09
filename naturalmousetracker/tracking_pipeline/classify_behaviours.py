@@ -70,6 +70,8 @@ def distanceBetweenPos(p1, p2):
 
 group_radius = 120
 social_radius = 150
+entranceX = 784
+entranceY = 450
 velocity_thresh = 5
 
 
@@ -82,6 +84,7 @@ def convertBack(x, y, w, h):
 
 
 def saveData(arr, SQL, csv, table):
+    # Save to both the CSV files and the array of data to be saved to the database at once.
     # print('save', arr)
     for val in arr:
         if val != "\n":
@@ -91,6 +94,7 @@ def saveData(arr, SQL, csv, table):
             else:
                 SQL[table].append([val])
         else:
+            # New Lines mark the end of frames
             csv.write(str(val))
             SQL['main'].append([])
             SQL['behaviour'].append([])
@@ -98,12 +102,15 @@ def saveData(arr, SQL, csv, table):
             SQL['pose'].append([])
 
 
+
+
+
 def run(dataDrive, dataPath, user, host, db, password):
     darkFile = open(dataDrive + dataPath + "/processed.json", "r")
     darkData = json.loads(darkFile.read())
 
     mouseDict = {} #Holds key=value pair in format Tag=List where every index is a frame
-    lastFrameDict = {} # Holds key=value pairs in format Tag=last index of data from json file added
+    lastFrameDict = {} # Holds key=value pairs in format Tag=last index of data from json file added n
     for tag in darkData.keys():
         mouseDict.update({tag: []})
         lastFrameDict.update({tag: 0})
@@ -111,6 +118,23 @@ def run(dataDrive, dataPath, user, host, db, password):
     totalFrames = max(map(lambda x: x[-1][3], darkData.values()))
 
     frameCount = 1
+    """
+    This section simply concatenates the positions into arrays of positions for each mouse,
+    for every frame. For frames where they are not tracked we append "None" instead.
+    This lets us iterate through the data as if it was a video, frame by frame.
+    Example:
+    Say we had two mice we were tracking, Mouse 1 and 2.
+    1 was tracked for frames 1, 2, 3, 5, 6, and 7.
+    2 was tracked for frames 0, 1, 2, 3, 4, 9, and 10.
+    The resulting mouseDict would look like this:
+    {
+        1: [None, posn, posn, posn, None, posn, posn, posn, None, None, None],
+        2: [posn, posn, posn, posn, posn, None, None, None, None, posn, posn]
+    }
+    A position looks like [x, y, w, h, <POSE DATA>]
+    We use the lastFrameDict when iterating through as we know the JSON file is sorted, so
+    we can build these arrays in one pass, an O(n) operation.
+    """
     while True:
         for (tag, datum) in darkData.items():
             if datum[-1][3] < frameCount:
@@ -118,11 +142,12 @@ def run(dataDrive, dataPath, user, host, db, password):
             else:
                 for i in range(lastFrameDict[tag], len(datum)):
                     if datum[i][3] == frameCount:
-                        if len(datum[i]) > 4:# if datum[row].length() > 4 what does that mean and why do we scale values
+                        if len(datum[i]) > 4:
                             x, y, w, h = datum[i][0]*912/640,\
                                 datum[i][1]*720/640,\
                                 datum[i][4]*912/640,\
-                                datum[i][5]*720/640  #darknet outputs square
+                                datum[i][5]*720/640  # Darknet saves the images to a 640x640 square
+                                # We resize these back to the original frame size.
                         else:
                             x, y, w, h = datum[i][0]*912/640,\
                                 datum[i][1]*720/640, 0, 0
@@ -146,13 +171,24 @@ def run(dataDrive, dataPath, user, host, db, password):
             break
     velocities = {}
     approaches = {}
+    exitPos = {}
+    entrancePos = {}
     files = {}
     SQL = {}
+    """
+    This is setting up the dictionaries of information
+    we want to easily access in each loop: the CSV files
+    we are writing to, the array of behaviours we save
+    to the SQL database later, and the exit and entry positions
+    for determining probablistic behaviours when mice are untracked.
+    """
     for tag in mouseDict.keys():
         velocities.update({tag: None})
         approaches.update({tag: []})
         files.update({tag: dataDrive + dataPath + "/classified_" + tag + ".csv"})
         SQL.update({tag: {'main': [], 'behaviour': [], 'position': [], 'pose': []}})
+        exitPos.update({tag: None})
+        entrancePos.update({tag: None})
     twoGroupFormingFrames = []
     twoGroupLeavingFrames = []
     threeGroupFormingFrames = []
@@ -179,30 +215,38 @@ def run(dataDrive, dataPath, user, host, db, password):
                             "L_Ear_x,L_Ear_y,R_Ear_x,R_Ear_y,"
                             "Velocity_x,Velocity_y,Speed,\n")
 
-    for i in range(0, totalFrames): #Iterate over all frames
+    for i in range(0, totalFrames): # Iterate over all frames
 
         group = set()
         print(i)
+        # Assign a behaviour for each mouse.
         for mouse, positions in mouseDict.items():
             behaviourAssigned = False
             saveData([mouse, date, timestamp + '-' + str(i).zfill(5)], SQL[mouse], files[mouse], 'main')
             if len(positions) <= i:
+                # An edge case. Should not get to this point, but if so, assume mouse is nesting.
                 saveData(['Nesting', '\n'], SQL[mouse], files[mouse], 'behaviour')
                 break
-            if i >= 1 and positions[i-1] is not None and positions[i] is not None: #If we have atleast 1 detection and it is not the first
+            if i >= 1 and positions[i-1] is not None and positions[i] is not None: 
+                # If we can calculate a velocity, do so and save it.
                 velocities.update({mouse:(positions[i][0][0] - positions[i-1][0][0],
                     positions[i][0][1] - positions[i-1][0][1])})
             else:
                 velocities.update({mouse: None})
+            # Are these mice grouping together with others?
             for other, other_pos in mouseDict.items():
                 if mouse != other:
                     if len(positions) <= i or len(other_pos) <= i:
                         continue
-                    dist = distanceBetweenPos(positions[i], other_pos[i]) #distance between two mice
+                    dist = distanceBetweenPos(positions[i], other_pos[i])
+                    # Add mice to the 'group' if they are close enough together
                     if dist and dist < group_radius:
                         group.add(mouse)
                         group.add(other)
                     elif dist and dist < social_radius and velocities[mouse] is not None:
+                        # If they are not grouping, they may be approaching. Determine
+                        # if their direction of motion is in the direction of another mouse.
+                        # Add Head/tail information to this later.
                         dist_vector = (other_pos[i][0][0] - positions[i][0][0],
                             other_pos[i][0][1] - positions[i][0][1])
                         dot = dist_vector[0]*velocities[mouse][0] + dist_vector[1]*velocities[mouse][1]
@@ -212,16 +256,21 @@ def run(dataDrive, dataPath, user, host, db, password):
                             if len(approaches[mouse]) == 0 or  approaches[mouse][-1][0] < i -10:
                                 approaches[mouse].append((i, other))
                                 behaviourAssigned = True
+                                # If they are approaching, that is their behaviour on this frame.
                                 saveData(['Approaching', other],SQL[mouse], files[mouse], 'behaviour')
             if mouse in group:
                 behaviourAssigned = True
                 if mouse not in lastGroup:
+                    #If they entered this group and they were not in a group before
                     saveData(['GroupEntering'], SQL[mouse], files[mouse], 'behaviour')
                 else:
                     if velocities[mouse] and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > velocity_thresh:
+                        #In a group, moving
                         saveData(['Grouping'], SQL[mouse], files[mouse], 'behaviour')
                     else:
-                        saveData(['Nesting'], SQL[mouse], files[mouse], 'behaviour')
+                        #In a group, not moving
+                        saveData(['Clumping'], SQL[mouse], files[mouse], 'behaviour')
+                # Adding "Others Involved"
                 writeStr = " "
                 for other in group:
                     if other != mouse:
@@ -229,28 +278,66 @@ def run(dataDrive, dataPath, user, host, db, password):
                 saveData([writeStr[:-1]], SQL[mouse], files[mouse], 'behaviour')
             else:
                 if mouse in lastGroup:
+                    #If they were in a group before and are no longer in one
                     saveData(['GroupLeaving'], SQL[mouse], files[mouse], 'behaviour')
                     behaviourAssigned = True
                     writeStr = " "
+                    #Adding "Others Involved"
                     for other in lastGroup:
                         if other != mouse:
                             writeStr += other + ';'
                     saveData([writeStr[:-1]], SQL[mouse], files[mouse], 'behaviour')
 
+            if positions[i] is not None:
+                # Reset exit and entry points when mouse is tracked
+                exitPos[tag] = None
+                entrancePos[tag] = None
+            else:
+                #Assign entry and exit points 
+                if exitPos[tag] is None:
+                    j = i
+                    while positions[j] is None and j >= 0:
+                        j -= 1
+                    if positions[j] is not None:
+                        exitPos[tag] = (j, positions[j])
+                    else:
+                        exitPos[tag] = (0, "Unknown")
+                if entrancePos[tag] is None:
+                    j = i
+                    while positions[j] is None and j >= 0:
+                        j += 1
+                    if positions[j] is not None:
+                        entrancePos[tag] = (j, positions[j])
+                    else:
+                        exitPos[tag] = (frameCount, "Unknown")
+
             if not behaviourAssigned:
                 if velocities[mouse] and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > velocity_thresh:
+                    # If they are moving and are alone, they are exploring.
                     saveData(["Exploring"], SQL[mouse], files[mouse], 'behaviour')
                 elif positions[i] is None:
-                    if (i > 5 and positions[i -5] is None) or (i < totalFrames - 6 and positions[i+5] is None):
-                        saveData(["Nesting"], SQL[mouse], files[mouse], 'behaviour')
+                    # We have no data for this section.
+                    if entrancePos[tag][0] - exitPos[tag][0] >= 60:
+                        # The period of unknown data is longer than 60 frames.
+                        # Mice are either Nesting or Clumping. If they are in the
+                        # entrance to the nesting area on either their disappearing
+                        # or reappearing position, assume they were nesting.
+                        if exitPos[tag][1][0] > entranceX and exitPos[tag][1][1] > entranceY:
+                            saveData(["Nesting"], SQL[mouse], files[mouse], 'behaviour')
+                        elif entrancePos[tag][1][0] > entranceX and entrancePos[tag][1][1] > entranceY:
+                            saveData(["Nesting"], SQL[mouse], files[mouse], 'behaviour')
+                        else:
+                            saveData(["Clumping"], SQL[mouse], files[mouse], 'behaviour')
+
                     else:
                         saveData(["Untracked"], SQL[mouse], files[mouse], 'behaviour')
                 else:
                     saveData(["Stationary"], SQL[mouse], files[mouse], 'behaviour')
-                # No other mouse involved
+                # No other mouse involved, write NULL to "Others Involved"
                 saveData(["NULL"], SQL[mouse], files[mouse], 'behaviour')
 
             if positions[i] is not None:
+                # Assign Locations to behaviours (In the corner? By the wall? etc.)
                 x, y = positions[i][0]
                 if x > 912*3/4 or x < 912*1/4:
                     if y > 720*3/4 or y < 720*1/4:
@@ -263,8 +350,11 @@ def run(dataDrive, dataPath, user, host, db, password):
                     saveData(["Center"], SQL[mouse], files[mouse], "behaviour")
                 count = 0
                 table = 'position'
+                # Save all the location and pose data with a simple regex.
                 for aspect in positions[i]:
                     if count >= 4:
+                        # bbox information goes in the position table. The rest goes in 
+                        # the pose table.
                         table = "pose"
                     if type(aspect).__name__ == 'tuple':
                         for num in aspect:
@@ -279,7 +369,7 @@ def run(dataDrive, dataPath, user, host, db, password):
                     saveData([0], SQL[mouse], files[mouse], table)
                     count += 1
             else:
-                # No Location
+                # No Location as their was no position
                 saveData(["NULL"], SQL[mouse], files[mouse], "behaviour")
                 table = 'position'
                 count = 0
@@ -289,11 +379,14 @@ def run(dataDrive, dataPath, user, host, db, password):
                     saveData([0], SQL[mouse], files[mouse], table)
                     count += 1
             if velocities[mouse] is not None:
+                # Save velocity if it is known
                 x, y = velocities[mouse]
                 speed = np.sqrt(x**2 + y**2)
                 saveData([float(x), float(y), float(speed)], SQL[mouse], files[mouse], 'position')
             else:
+                # 0 Otherwise
                 saveData([0, 0, 0], SQL[mouse], files[mouse], 'position')
+            # Mark the end of this frame with a new line.
             saveData(['\n'], SQL[mouse], files[mouse], '')
 
         if len(group) == 2 and len(lastGroup) < 2:
@@ -308,6 +401,7 @@ def run(dataDrive, dataPath, user, host, db, password):
 
     for file in files.values():
         file.close()
+    # Save all the info to SQL
     for tag, data in SQL.items():
             for i in range(0, len(data['main']) -1):
                 if i % 100 == 0:
