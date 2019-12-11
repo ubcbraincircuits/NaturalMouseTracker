@@ -8,3 +8,4 @@ __pycache__/*
 */*/__pycache__/*
 build/*
 dist/*
+naturalmousetracker_Judge24601.egg-info/*

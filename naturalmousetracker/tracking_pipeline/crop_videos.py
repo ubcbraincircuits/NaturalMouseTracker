@@ -6,14 +6,19 @@ import json
 import os
 import shutil
 import argparse
-from multiprocessing import Process
-from MouseTracker import MouseTracker
+from billiard.context import Process
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 from time import sleep
 from tqdm import tqdm
 
 def convertBack(x, y, w, h):
+    '''
+    Given some bounding box defined by x,y,w,h
+    where x,y = center of bounding box
+
+    return the coordinate of its bottom l and top r corners
+    '''
     xmin = int(round(x - (w / 2)))
     xmax = int(round(x + (w / 2)))
     ymin = int(round(y - (h / 2)))
@@ -22,9 +27,26 @@ def convertBack(x, y, w, h):
 
 
 def createVideo(tag, datum, fourcc, dataDrive, dataPath, frames, trackProgress):
+    '''
+    given a tracking.h264 file and tag of mouse featured in the video,
+    crop every frame of the video to a box surrounding the mouse
+    replacing cropped portions with whitespace
+
+    in addition, creates a text file that contains every frame number on which
+    the mouse of interest was validated by a reader.
+
+    This function does the majority of the work for its class.
+    The run method of crop_vidos.py is called from main and it creates
+    worker processes to carry out this function in paralell
+    '''
     global trialName
     if not frames:
-        cap = cv2.VideoCapture(dataDrive + dataPath + "tracking_system" + trialName + '.h264')
+        cap = cv2.VideoCapture(dataDrive + dataPath + "/tracking" + '.h264')
+        print(dataDrive
+            + dataPath
+            + "/tracking"
+            + '.h264')
+
     table = np.array([((i/255.0) ** 0.75)*255 #0.7 to 0.9 seems like a good range.
         for i in np.arange(0, 256)]).astype('uint8')
     frameCount = 1
@@ -41,6 +63,7 @@ def createVideo(tag, datum, fourcc, dataDrive, dataPath, frames, trackProgress):
                 else:
                     success, frame_read = cap.read()
                     if not success:
+                        print("unable to cap read")
                         break
                 frameCount += 1
                 frame_read = cv2.LUT(frame_read, table)
@@ -91,16 +114,18 @@ def createVideo(tag, datum, fourcc, dataDrive, dataPath, frames, trackProgress):
 
 
 def run(dataDrive, dataPath, frames=False):
+    print("Current dir from first line in run",os.listdir())
     darkFile = open(dataDrive + dataPath + "/processed.json", "r")
     darkData = json.loads(darkFile.read())
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # 'x264' doesn't work
-    main = cv2.VideoWriter('output_filtered_' + dataPath + '.avi', fourcc, 15.0, (912, 720))
+    main = cv2.VideoWriter(dataDrive + dataPath + '/output_filtered' + '.avi', fourcc, 15.0, (912, 720))
     try:
         shutil.rmtree(dataDrive + dataPath + "/videos")
     except Exception as e:
         print(str(e))
         pass
     finally:
+        print("Just created videos folder")
         os.mkdir(dataDrive + dataPath + "/videos")
     processes = []
     track = True
@@ -112,6 +137,8 @@ def run(dataDrive, dataPath, frames=False):
     sleep(5)
     for process in processes:
         process.join()
+
+
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":

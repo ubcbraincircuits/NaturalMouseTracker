@@ -90,7 +90,6 @@ if os.name == "nt":
     os.environ['PATH'] = cwd + ';' + os.environ['PATH']
     with pkg_resources.path(data, 'yolo_cpp_dll.dll') as winGPUdll:
         winGPUdll = str(winGPUdll.absolute())
-    print("HI", winGPUdll)
     winNoGPUdll = os.path.join(cwd, "yolo_cpp_dll_nogpu.dll")
     envKeys = list()
     for k, v in os.environ.items():

@@ -13,11 +13,11 @@ def convertBack(x, y, w, h):
     ymax = int(round(y + (h / 2)))
     return xmin, ymin, xmax, ymax
 
-likelihood_thresh = 0.5
+likelihood_thresh = 0.9
 
-def run(dataDrive, dataPath):
-    config_path = 'G://PoseEstimation-Braeden-2019-11-13//config.yaml'
-    #deeplabcut.analyze_videos(config_path, [dataDrive + dataPath + "/videos"], videotype=".avi", save_as_csv=True)
+def run(dataDrive, dataPath, configPath, useFrames=False):
+    # config_path = 'G://PoseEstimation-Braeden-2019-11-13//config.yaml'
+    # deeplabcut.analyze_videos(configPath, [dataDrive + dataPath + "/videos"], videotype=".avi", save_as_csv=True)
 
     with open (dataDrive + dataPath + "/processed.json", "r") as darkFile:
         darkData = json.loads(darkFile.read())
@@ -59,19 +59,31 @@ def run(dataDrive, dataPath):
                             json_index += 1
 
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
-    video = cv2.VideoWriter('output_pairs' + dataPath + '.avi',fourcc, 15.0, (912, 720))
+    video = cv2.VideoWriter(dataDrive + dataPath + '/output_pairs.avi',fourcc, 15.0, (912, 720))
     frameCount = 1
     lastFrameDict = {}
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # 'x264' doesn't work
     for tag in darkData.keys():
         lastFrameDict.update({tag: 0})
+    if not useFrames:
+        cap = cv2.VideoCapture(dataDrive + dataPath + "/tracking" + '.h264')
+        print(dataDrive
+            + dataPath
+            + "/tracking"
+            + '.h264')
     while True:
         try:
             frameName = dataDrive + dataPath + "/tracking_systembase_tracking" + str(frameCount) + ".jpg"
-            frame_read = cv2.imread(frameName)
+            if useFrames:
+                frame_read = cv2.imread(frameName)
+            else:
+                success, frame_read = cap.read()
+                if not success:
+                    print("unable to cap read")
+                    raise Exception("Done")
+                    break
             frameCount += 1
-            print(frameCount)
-            frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
+            # frame_read = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
         except Exception as e:
             print(str(e))
             break
@@ -95,21 +107,21 @@ def run(dataDrive, dataPath):
                         r_ear = (positions[lastFrameDict[tag]][12], positions[lastFrameDict[tag]][13])
                         if head != (None, None):
                             head = (int(head[0]), int(head[1]))
-                            cv2.circle(frame_rgb, head, 5, [0, 0, 255])
+                            cv2.circle(frame_read, head, 5, [0, 0, 255])
                             if tail != (None, None):
                                 tail = (int(tail[0]), int(tail[1]))
-                                cv2.line(frame_rgb, head, tail, [0, 255, 0])
+                                cv2.line(frame_read, head, tail, [0, 255, 0])
                         if tail != (None, None):
                             tail = (int(tail[0]), int(tail[1]))
-                            cv2.circle(frame_rgb, tail, 5, [255, 0, 0])
+                            cv2.circle(frame_read, tail, 5, [255, 0, 0])
                         if l_ear != (None, None):
                             l_ear = (int(l_ear[0]), int(l_ear[1]))
-                            cv2.circle(frame_rgb, l_ear, 5, [255, 255, 0])
+                            cv2.circle(frame_read, l_ear, 5, [255, 255, 0])
                         if r_ear != (None, None):
                             r_ear = (int(r_ear[0]), int(r_ear[1]))
-                            cv2.circle(frame_rgb, r_ear, 5, [0, 255, 255])
-                    cv2.rectangle(frame_rgb, pt1, pt2, (0, 255, 0), 1)
-                    cv2.putText(frame_rgb,
+                            cv2.circle(frame_read, r_ear, 5, [0, 255, 255])
+                    cv2.rectangle(frame_read, pt1, pt2, (0, 255, 0), 1)
+                    cv2.putText(frame_read,
                                 str(tag),
                                 (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                                 [0, 255, 0], 2)
@@ -118,7 +130,8 @@ def run(dataDrive, dataPath):
                     lastFrameDict[tag] += 1
                 else:
                     break
-        video.write(frame_rgb)
+        print("wrote frame", frameCount)
+        video.write(frame_read)
     video.release()
     with open(dataDrive + dataPath + "/processed_ht.json", "w") as outfile:
         json.dump(darkData, outfile, ensure_ascii=False)

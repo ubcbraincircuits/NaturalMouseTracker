@@ -20,7 +20,7 @@ except ImportError:
     # Try backported to PY<37 `importlib_resources`.
     import importlib_resources as pkg_resources
 from naturalmousetracker import data
-#from ImageProcessing import cvDrawBoxes
+from naturalmousetracker.detection_utils.ImageProcessing import ImageProcessing
 import argparse
 import itertools
 from munkres import Munkres
@@ -28,58 +28,6 @@ from tqdm import tqdm
 from shutil import copyfile
 from naturalmousetracker.detection_utils.readEncoding import decode
 from naturalmousetracker.detection_utils.MouseTracker import MouseTracker
-
-def convertBack(x, y, w, h):
-    xmin = int(round(x - (w / 2)))
-    xmax = int(round(x + (w / 2)))
-    ymin = int(round(y - (h / 2)))
-    ymax = int(round(y + (h / 2)))
-    return xmin, ymin, xmax, ymax
-
-
-def cvDrawBoxes(detections, img, mice):
-    for mouse in mice:
-        if mouse.visualTracker is not None:
-            pos = mouse.getPosition()
-            x, y, w, h =  pos[0], pos[1], pos[4], pos[5]
-            xmin, ymin, xmax, ymax = convertBack(
-                float(x), float(y), float(w), float(h))
-            pt1 = (xmin, ymin)
-            pt2 = (xmax, ymax)
-            cv2.rectangle(img, pt1, pt2, (255, 0, 255), 1)
-            cv2.putText(img,
-                 str(mouse.tag()) +
-                 " [vis]",
-                  (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                  [255, 0, 255], 2)
-
-    for detection in detections:
-        x, y, w, h = detection[2][0],\
-            detection[2][1],\
-            detection[2][2],\
-            detection[2][3]
-        vx = detection[3][0]
-        vy = detection[3][1]
-        xmin, ymin, xmax, ymax = convertBack(
-            float(x), float(y), float(w), float(h))
-        pt1 = (xmin, ymin)
-        pt2 = (xmax, ymax)
-        cv2.rectangle(img, pt1, pt2, (0, 255, 0), 1)
-        cv2.rectangle(img, (entranceX, entranceY), (640, 640), [0, 120,120])
-        cv2.circle(img, (int(x), int(y)), 5, [0, 0, 255])
-        cv2.circle(img, (int(550*640/640), int(350*640/480)), 5, [0, 255, 0])
-        cv2.circle(img, (int(550*640/640), int(100*640/480)), 5, [0, 255, 0])
-        cv2.circle(img, (int(100*640/640), int(100*640/480)), 5, [0, 255, 0])
-        cv2.circle(img, (int(100*640/640), int(350*640/480)), 5, [0, 255, 0])
-        cv2.circle(img, (int(x), int(y)), maxSwapDistance, [255, 0, 0])
-        cv2.arrowedLine(img, (int(x - vx/2), int(y - vy/2)), (int(x + vx/2), int(y + vy/2)), [0, 0, 255])
-        cv2.putText(img,
-                    str(detection[0]) +
-                    " [" + str(round(detection[1] * 100, 2)) + "]",
-                    (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                    [0, 255, 0], 2)
-
-    return img
 
 netMain = None
 metaMain = None
@@ -92,19 +40,11 @@ maxSwapDistance = 100
 minSwapIOU = 0.2
 
 
-def miceWithinDistance(mice, distance):
-    within_dist = False
-    for mouse in mice:
-        for other in mice:
-            if other is not mouse and mouse.distanceFromPos(other.getPosition()) < distance:
-                within_dist = True
-    return within_dists
-
-
 def YOLO(trialName, mice, RFID, showVideo):
     miceNum = len(mice)
     global dataPath, dataDrive, useFrames, verbose, tags
     global metaMain, netMain, altNames
+    #Loading required darknet files
     with pkg_resources.path(data, 'yolo-obj.cfg') as configPath, pkg_resources.path(data, 'yolo-obj_best.weights') as weightPath, pkg_resources.path(data, 'obj.data') as metaPath:
         if not os.path.exists(configPath.absolute()):
             raise ValueError("Invalid config path `" +
@@ -151,6 +91,7 @@ def YOLO(trialName, mice, RFID, showVideo):
                                     darknet.network_height(netMain),3)
     if not useFrames:
         cap = cv2.VideoCapture(dataDrive + dataPath + "/tracking.h264")
+
     frameCount = 1
     """
     Problem: Mice disappear and then reappear while others are unidentified. They should be instantly identified but are not.
@@ -183,16 +124,18 @@ def YOLO(trialName, mice, RFID, showVideo):
             #     RFIDIndices.append(lastRFIDIndex + 1)
             #     validationFrame = True
             #     lastRFIDIndex += 1
+
             if useFrames:
                 frame_read = cv2.imread(frameName)
             else:
                 success, frame_read = cap.read()
                 if not success:
+                    print("Had problems with frame_read")
                     break
             if decode(frame_read) != -1:
                 validationFrame = True
                 validationTag, validationReader = decode(frame_read)
-                print(decode(frame_read))
+                printCheck(decode(frame_read))
                 validationTag = tags[validationTag]
                 printCheck(validationReader)
                 validationReader = readerMap[validationReader]
@@ -539,7 +482,7 @@ def YOLO(trialName, mice, RFID, showVideo):
                 error = False
 
         if showVideo:
-            out = cvDrawBoxes(cleanedDetections, image, mice)
+            out = ImageProcessing.cvDrawBoxes(cleanedDetections, image, mice)
             cv2.imshow('Demo', out)
             cv2.waitKey(3)
         printCheck(list(map(lambda x: x.tag(), mice)),"mice")
@@ -552,11 +495,10 @@ def YOLO(trialName, mice, RFID, showVideo):
         #         i += 1
         #     plt.legend()
         #     plt.show()
-        # input("next")
 #        time.sleep(0.2)
     mouseDict = {}
     pbar.close()
-    for mouse in mouseTrackers:
+    for mouse in filter(lambda x: x.tag() > 99999, mice + lostTrackers):
         mouseDict.update({mouse.tag(): mouse.recordedPositions})
         printCheck(mouse.tag(), str(len(mouse.recordedPositions)/frameCount*100) + "% Covered")
     printCheck(list(map(lambda x: str(x[0]) + ":" + str(len(x[1])), event.items())))
@@ -576,6 +518,7 @@ def scrapeText(RTS):
     with open(RTS) as f:
         content = f.readlines()
         for row in content:
+            print(row)
             row = row.rstrip("\n")
             taglist.append(int(row))
     return taglist
@@ -593,6 +536,7 @@ def run(drive, path, showVid=False, frames=False, verb=False):
         dataFileName += args.get("name", "") + ".txt"
     else:
         dataFileName = dataDrive + dataPath + "/RTS_test.txt"
+        print("data file name:", dataFileName)
     tags = scrapeText(dataFileName)
     printCheck(tags)
     for tag in tags:

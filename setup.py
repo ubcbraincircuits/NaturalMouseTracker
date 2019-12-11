@@ -3,6 +3,8 @@ from shutil import copy2
 from os import path
 
 here = path.abspath(path.dirname(__file__))
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
 
 darknetPath = input("Please enter the full path to your darknet installation.\
     On Windows, this will look similar to C:/Users/<user>/.../darknet/ .")
@@ -38,4 +40,5 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
+    install_requires=requirements,
 )

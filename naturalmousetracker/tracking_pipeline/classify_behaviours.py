@@ -5,6 +5,7 @@ import argparse
 import pymysql
 import getpass
 import re
+import mysql.connector
 
 
 
@@ -141,8 +142,8 @@ def run(dataDrive, dataPath, user, host, db, password):
                         mouseDict[tag].append(None)
                         break
         frameCount += 1
-        print(frameCount)
-        if frameCount > totalFrames:
+        # print(frameCount)
+        if frameCount >= totalFrames:
             break
     velocities = {}
     approaches = {}
@@ -159,8 +160,14 @@ def run(dataDrive, dataPath, user, host, db, password):
     threeGroupLeavingFrames = []
     lastGroup = set()
     date, timestamp = dataPath.split('_')
-    db = pymysql.connect(host=host, user=user, db=db, password=password)
-    cur = db.cursor()
+    print("trying to connect")
+    try:
+        db = mysql.connector.connect(host=host, user=user, db=db, password=password,
+            auth_plugin="mysql_native_password")
+        cur = db.cursor()
+    except Exception as e:
+        print(str(e))
+        return
     main_save_query = """INSERT INTO `MiceEvents` (`Tag`, `Date`, `Time`,
     `Behaviour`, `Position`, `Pose`) VALUES(%s,%s,%s,%s,%s,%s)"""
     behaviour_save_query = """INSERT INTO `Behaviours` (`Name`, `Others`,
@@ -168,7 +175,7 @@ def run(dataDrive, dataPath, user, host, db, password):
     position_save_query = """INSERT INTO `Positions` (`Center_x`, `Center_y`,
         `Width`, `Height`, `V_x`, `V_y`, `Speed`)
         VALUES(%s,%s,%s,%s,%s,%s,%s)"""
-    pose_save_query = """INSERT INTO `Pose` (`Head_x`, `Head_y`,
+    pose_save_query = """INSERT INTO `Poses` (`Head_x`, `Head_y`,
         `Tail_x`, `Tail_y`, `LeftEar_x`, `LeftEar_y`,
         `RightEar_x`, `RightEar_y`) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
     for tag, name in files.items():
@@ -179,10 +186,11 @@ def run(dataDrive, dataPath, user, host, db, password):
                             "L_Ear_x,L_Ear_y,R_Ear_x,R_Ear_y,"
                             "Velocity_x,Velocity_y,Speed,\n")
 
+    print("here")
     for i in range(0, totalFrames): #Iterate over all frames
 
         group = set()
-        print(i)
+        # print(i)
         for mouse, positions in mouseDict.items():
             behaviourAssigned = False
             saveData([mouse, date, timestamp + '-' + str(i).zfill(5)], SQL[mouse], files[mouse], 'main')
@@ -305,13 +313,12 @@ def run(dataDrive, dataPath, user, host, db, password):
         if len(group) < 2 and len(lastGroup) == 2:
             twoGroupLeavingFrames.append(i)
         lastGroup = group
-
+    print("Saving...")
     for file in files.values():
         file.close()
     for tag, data in SQL.items():
             for i in range(0, len(data['main']) -1):
-                if i % 100 == 0:
-                    print(i)
+                print(i)
                 try:
                     cur.execute(pose_save_query, data['pose'][i])
                     pose_id = cur.lastrowid
@@ -320,12 +327,11 @@ def run(dataDrive, dataPath, user, host, db, password):
                     position_id = cur.lastrowid
                     # print('position done')
                     cur.execute(behaviour_save_query, data['behaviour'][i])
-                    # print('behaviour done')
+                    print('behaviour done')
                     behaviour_id = cur.lastrowid
                     cur.execute(main_save_query, data['main'][i] + [behaviour_id, position_id, pose_id])
-                except pymysql.Error as e:
-                    pass
-                    # print(str(e))
+                except Exception as e:
+                    print(str(e))
             db.commit()
     db.close()
     print("two - Entering:", len(twoGroupFormingFrames),  "- Leaving:",  len(twoGroupLeavingFrames))
