@@ -83,6 +83,53 @@ def convertBack(x, y, w, h):
     ymax = int(round(y + (h / 2)))
     return xmin, ymin, xmax, ymax
 
+def getHeadVector(poseData):
+    nose     = poseData[0]
+    head     = poseData[1]
+    neck     = poseData[4]
+    midspine = poseData[5]
+    options = ((head, nose), (neck, nose), (midspine, nose),
+        (neck, head), (midspine, head), (midspine, neck))
+    chosen_opt, midpoint, angle = None, None, None
+    for opt in options:
+        if opt[0] != (None, None) and opt[1] != (None, None):
+            midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
+            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
+            angle *= (180/np.pi)
+            chosen_opt = opt
+            break
+    return (chosen_opt, midpoint, angle)
+
+def getTailVector(poseData):
+    midspine = poseData[5]
+    pelvis   = poseData[6]
+    tail     = poseData[7]
+    options = ((pelvis, tail), (midspine, tail), (midspine, pelvis))
+    chosen_opt, midpoint, angle = None, None, None
+    for opt in options:
+        if opt[0] != (None, None) and opt[1] != (None, None):
+            midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
+            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
+            angle *= (180/np.pi)
+            chosen_opt = opt
+            break
+    return (chosen_opt, midpoint, angle)
+
+def getMidVector(poseData):
+    neck = poseData[4]
+    midspine = poseData[5]
+    pelvis   = poseData[6]
+    options = ((pelvis, neck), (midspine, neck), (pelvis, midspine))
+    chosen_opt, midpoint, angle = None, None, None
+    for opt in options:
+        if opt[0] != (None, None) and opt[1] != (None, None):
+            midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
+            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
+            angle *= (180/np.pi)
+            chosen_opt = opt
+            break
+    return (chosen_opt, midpoint, angle)
+
 
 def saveData(arr, SQL, csv, table):
     # Save to both the CSV files and the array of data to be saved to the database at once.
@@ -154,12 +201,21 @@ def run(dataDrive, dataPath, user, host, db, password):
                                 datum[i][1]*720/640, 0, 0
                         xmin, ymin, xmax, ymax = convertBack(
                             float(x), float(y), float(w), float(h))
-                        # head_pos = (datum[i][6], datum[i][7])
-                        # tail_pos = (datum[i][8], datum[i][9])
+                        poseParts = []
+                        # Nose, head, left ear, right ear, neck,
+                        # midspine, pelvis, tail
+                        i = 6
+                        while i < len(positions[lastFrameDict[tag]]) - 1:
+                            if positions[lastFrameDict[tag]][i] is not None:
+                                poseParts.append((float(positions[lastFrameDict[tag]][i]),\
+                                    float(positions[lastFrameDict[tag]][i+1])))
+                            else:
+                                poseParts.append((None, None))
+                            i += 2
                         center = (float(x), float(y))
                         # pt1 = (xmin, ymin)
                         # pt2 = (xmax, ymax)
-                        pos = [center, float(w), float(h)] # head_pos, #tail_pos]
+                        pos = [center, float(w), float(h), poseParts] # head_pos, #tail_pos]
                         mouseDict[tag].append(pos)
                         lastFrameDict[tag] =i
                         break
@@ -171,6 +227,7 @@ def run(dataDrive, dataPath, user, host, db, password):
         if frameCount >= totalFrames:
             break
     velocities = {}
+    vectors = {}
     approaches = {}
     exitPos = {}
     entrancePos = {}
@@ -186,6 +243,7 @@ def run(dataDrive, dataPath, user, host, db, password):
     for tag in mouseDict.keys():
         velocities.update({tag: None})
         approaches.update({tag: []})
+        vectors.update({tag: {'head': None, 'tail':None, 'mid': None}})
         files.update({tag: dataDrive + dataPath + "/classified_" + tag + ".csv"})
         SQL.update({tag: {'main': [], 'behaviour': [], 'position': [], 'pose': []}})
         exitPos.update({tag: None})

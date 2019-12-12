@@ -4,6 +4,7 @@ import os
 import json
 import csv
 import cv2
+import numpy as np
 import fnmatch
 
 def convertBack(x, y, w, h):
@@ -13,7 +14,55 @@ def convertBack(x, y, w, h):
     ymax = int(round(y + (h / 2)))
     return xmin, ymin, xmax, ymax
 
-likelihood_thresh = 0.9
+likelihood_thresh = 0.95
+
+def getHeadVector(poseData):
+    nose     = poseData[0]
+    head     = poseData[1]
+    neck     = poseData[4]
+    midspine = poseData[5]
+    options = ((head, nose), (neck, nose), (midspine, nose),
+        (neck, head), (midspine, head), (midspine, neck))
+    chosen_opt, midpoint, angle = None, None, None
+    for opt in options:
+        if opt[0] != (None, None) and opt[1] != (None, None):
+            midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
+            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
+            angle *= (180/np.pi)
+            chosen_opt = opt
+            break
+    return (chosen_opt, midpoint, angle)
+
+def getTailVector(poseData):
+    midspine = poseData[5]
+    pelvis   = poseData[6]
+    tail     = poseData[7]
+    options = ((pelvis, tail), (midspine, tail), (midspine, pelvis))
+    chosen_opt, midpoint, angle = None, None, None
+    for opt in options:
+        if opt[0] != (None, None) and opt[1] != (None, None):
+            midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
+            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
+            angle *= (180/np.pi)
+            chosen_opt = opt
+            break
+    return (chosen_opt, midpoint, angle)
+
+def getMidVector(poseData):
+    neck = poseData[4]
+    midspine = poseData[5]
+    pelvis   = poseData[6]
+    options = ((pelvis, neck), (midspine, neck), (pelvis, midspine))
+    chosen_opt, midpoint, angle = None, None, None
+    for opt in options:
+        if opt[0] != (None, None) and opt[1] != (None, None):
+            midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
+            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
+            angle *= (180/np.pi)
+            chosen_opt = opt
+            break
+    return (chosen_opt, midpoint, angle)
+
 
 def run(dataDrive, dataPath, configPath, useFrames=False):
     # config_path = 'G://PoseEstimation-Braeden-2019-11-13//config.yaml'
@@ -45,7 +94,7 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                             if int(positions[json_index][3]) > int(row[0]):
                                 continue
                             i = 3
-                            while i < 13:
+                            while i < 25:
                                 if(index == 3):
                                     print(i, len(row), row[0])
                                     print(json_index)
@@ -100,26 +149,41 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                         float(x), float(y), float(w), float(h))
                     pt1 = (xmin, ymin)
                     pt2 = (xmax, ymax)
+                    poseParts = []
+                    # Nose, head, left ear, right ear, neck,
+                    # midspine, pelvis, tail
+                    colors = [
+                        [255, 0, 0],
+                        [0, 255, 0],
+                        [0, 0, 255],
+                        [255, 255, 0],
+                        [255, 0, 255],
+                        [0, 255, 255],
+                        [255,255,255],
+                        [0,0,0]
+                    ]
+                    i = 6
+                    while i < len(positions[lastFrameDict[tag]]) - 1:
+                        if positions[lastFrameDict[tag]][i] is not None:
+                            poseParts.append((int(positions[lastFrameDict[tag]][i]),\
+                                int(positions[lastFrameDict[tag]][i+1])))
+                        else:
+                            poseParts.append((None, None))
+                        i += 2
+                    print(poseParts)
                     if len(positions[lastFrameDict[tag]]) >=10:
-                        head = (positions[lastFrameDict[tag]][6], positions[lastFrameDict[tag]][7])
-                        tail = (positions[lastFrameDict[tag]][8], positions[lastFrameDict[tag]][9])
-                        l_ear = (positions[lastFrameDict[tag]][10], positions[lastFrameDict[tag]][11])
-                        r_ear = (positions[lastFrameDict[tag]][12], positions[lastFrameDict[tag]][13])
-                        if head != (None, None):
-                            head = (int(head[0]), int(head[1]))
-                            cv2.circle(frame_read, head, 5, [0, 0, 255])
-                            if tail != (None, None):
-                                tail = (int(tail[0]), int(tail[1]))
-                                cv2.line(frame_read, head, tail, [0, 255, 0])
-                        if tail != (None, None):
-                            tail = (int(tail[0]), int(tail[1]))
-                            cv2.circle(frame_read, tail, 5, [255, 0, 0])
-                        if l_ear != (None, None):
-                            l_ear = (int(l_ear[0]), int(l_ear[1]))
-                            cv2.circle(frame_read, l_ear, 5, [255, 255, 0])
-                        if r_ear != (None, None):
-                            r_ear = (int(r_ear[0]), int(r_ear[1]))
-                            cv2.circle(frame_read, r_ear, 5, [0, 255, 255])
+                        for i in range(0, len(poseParts)):
+                            if poseParts[i][0] is not None:
+                                cv2.circle(frame_read, poseParts[i], 5, colors[i])
+                        h_v = getHeadVector(poseParts)[0]
+                        t_v = getTailVector(poseParts)[0]
+                        m_v = getMidVector(poseParts)[0]
+                        if h_v is not None:
+                            cv2.arrowedLine(frame_read, h_v[0], h_v[1], [255, 0, 0])
+                        if t_v is not None:
+                            cv2.arrowedLine(frame_read, t_v[0], t_v[1], [0, 255, 0])
+                        if m_v is not None:
+                            cv2.arrowedLine(frame_read, m_v[0], m_v[1], [0, 0, 255])
                     cv2.rectangle(frame_read, pt1, pt2, (0, 255, 0), 1)
                     cv2.putText(frame_read,
                                 str(tag),
