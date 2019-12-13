@@ -24,9 +24,6 @@ In certain failure cases such as a the system losing track of a known mouse, it 
 ### RFID Validation
 RFID validation is used to correct and update the current state of the system. If an identity swap occurs that is not handled by the preventative destruction method, then there must be countermeasures. Thus, if a mouse identified by the system as tracked walks over an RFID sensor and is shown to be a different tag, then its data must be removed up to the last validation point, i.e. the last point it was confirmed by an RFID sensor. 
 
-### Bundle Averaging
-When mice are sleeping and are bundled together, there may be no easy way to segment this bundle into distinct mice. However, since the movement during these periods is minimal, and the mice are not far apart, then the bundles can be averaged to provide the mice with an approximate position for these times.
-
 By combining these methods, we can confirm no identity swaps and an 80%+ coverage rating for this system.
 
 ### Sources
