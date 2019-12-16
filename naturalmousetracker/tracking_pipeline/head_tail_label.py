@@ -163,7 +163,15 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                         float(x), float(y), float(w), float(h))
                     pt1 = (xmin, ymin)
                     pt2 = (xmax, ymax)
+
+                    #Smaller rectangle for HTS and STS
+                    HTS_p1 = (xmin + 1/2*w, ymin + 1/2*h)
+                    HTS_p2 = (xmax - 1/2*w, ymin - 1/2*h)
+
                     poseParts = []
+                    #Draw rectangle used in head side calculations
+                    cv2.rectangle(frame_read, HTS_p1, HTS_pt2, (0, 255, 0), 1)
+
                     # Nose, head, left ear, right ear, neck,
                     # midspine, pelvis, tail
                     colors = [
@@ -213,6 +221,8 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                         m_v = getMidVector(poseParts)
                         h_v = getHeadVector(poseParts, m_v[2])
                         t_v = getTailVector(poseParts, m_v[2])
+
+
                         if h_v[0] is not None:
                             cv2.arrowedLine(frame_read, h_v[0][0], h_v[0][1], [255, 0, 0])
                             FOV = np.array(getFOV(h_v), dtype=np.int32)
