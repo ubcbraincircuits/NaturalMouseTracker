@@ -170,7 +170,7 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
 
                     poseParts = []
                     #Draw rectangle used in head side calculations
-                    cv2.rectangle(frame_read, HTS_p1, HTS_pt2, (0, 255, 0), 1)
+                    cv2.rectangle(frame_read, HTS_p1, HTS_p2, (0, 255, 0), 1)
 
                     # Nose, head, left ear, right ear, neck,
                     # midspine, pelvis, tail
