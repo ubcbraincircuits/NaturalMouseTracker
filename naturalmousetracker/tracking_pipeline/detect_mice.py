@@ -32,10 +32,9 @@ from naturalmousetracker.detection_utils.MouseTracker import MouseTracker
 netMain = None
 metaMain = None
 altNames = ["mouse"]
-readerMap = [[100, 350], [550, 350], [100, 100], [550, 100]]
-readerMap = [[550, 350], [100, 100], [550, 100], [100, 350]]
-entranceX = 550
-entranceY = 300
+readerMap = [[100, 467], [550, 467], [100, 133], [550, 133]]
+entranceX = 580
+entranceY = 250
 maxSwapDistance = 100
 minSwapIOU = 0.2
 
@@ -168,11 +167,13 @@ def YOLO(trialName, mice, RFID, showVideo):
 
 
         for mouse in partialLostTrackers: #Every frame increment all lostCounters who are not -1
-            if mouse.lostCounter >= 10:
+            if mouse.lostCounter >= 30:
+                printCheck("Counter of ", mouse.tag(), "above thresh, removing from PL")
                 if mouse.id > 99999:
                     lostTrackers.append(mouse)
                     mouse.lostCounter = -1
-                mice.remove(mouse)
+                if mouse in mice:
+                    mice.remove(mouse)
                 partialLostTrackers.remove(mouse)
 
 
@@ -229,8 +230,10 @@ def YOLO(trialName, mice, RFID, showVideo):
                 updatedDetection.append(mouse.velocity)
                 detections.remove(detection)
                 cleanedDetections.append(updatedDetection)
-                if len(partialLostTrackers) == 1 and mouse.tag() == partialLostTrackers[0].tag():
-                    partialLostTrackers = []
+                if len(partialLostTrackers) > 0 and mouse.tag() == partialLostTrackers[0].tag():
+                    mouse.lostCounter = -1
+                    partialLostTrackers.remove(mouse)
+
         """
         Any unassigned detections are given dummy tags.
         """
@@ -305,18 +308,22 @@ def YOLO(trialName, mice, RFID, showVideo):
 
                 printCheck(numClose, 'nearbyMice')
                 if numClose == 0 and tracker.getPosition()[0] > entranceX and tracker.getPosition()[1] > entranceY:
-                     event["lost_mouse"].append((frameName, tracker.tag()))
-                     printCheck("mouse exited")
-                     if tracker.tag() > 99999:
-                         # This is not a dummy tracker, we can find it again
-                         lostTrackers.append(tracker)
-                     try:
-                         mice.remove(tracker)
-                     except Exception as e:
-                         printCheck(str(e))
-                         # for safety idk
-                         pass
+                    event["lost_mouse"].append((frameName, tracker.tag()))
+                    printCheck("mouse exited")
+                    if len(mice) == miceNum:
+                        partialLostTrackers.append(tracker)
+                    else:
+                        if tracker.tag() > 99999:
+                            # This is not a dummy tracker, we can find it again
+                            lostTrackers.append(tracker)
+                        try:
+                            mice.remove(tracker)
+                        except Exception as e:
+                            printCheck(str(e))
+                            # for safety idk
+                            pass
                 elif len(tracker.recordedPositions) <= 5 and tracker.tag() < 99999:
+                    printCheck("Mouse is lost")
                     mice.remove(tracker)
                 else:
                     partialLostTrackers.append(tracker)
@@ -330,6 +337,7 @@ def YOLO(trialName, mice, RFID, showVideo):
             if partialLostTrackers[0].intersectionOverUnion([pos[0], pos[1], pos[4], pos[5]]) > 0 and len(partialLostTrackers) == 2:
                 for tracker in partialLostTrackers:
                     #printCheck(track.tag(), "partial lost")
+                    printCheck("Removed ", tracker.tag(), "From partial lost")
                     event["lost_mouse"].append((frameName, tracker.tag()))
                     if tracker.tag() > 99999:
                         # This is not a dummy tracker, we can find it again
@@ -378,14 +386,15 @@ def YOLO(trialName, mice, RFID, showVideo):
                 if validationTag == tracker.tag():
                     usedIndex = True
                     # Match!
-                    validationReader[0] *= 640/640
-                    validationReader[1] *= 640/480
+                    printCheck("validation", validationTag, validationReader)
                     nearestMice = sorted(mice, key= lambda x: x.distanceFromPos(validationReader))
                     if len(nearestMice) < 1 or nearestMice[0].distanceFromPos(validationReader) > 300:
                         # If nearest mouse is not currently detected. do nothing
+                        printCheck("no mice near")
                         break
                     if len(nearestMice) >= 2 and abs(nearestMice[0].distanceFromPos(validationReader) - nearestMice[1].distanceFromPos(validationReader)) < maxSwapDistance:
                         # We cannot be certain which one is over the reader
+                        printCheck("Cannot be sure")
                         break
                     # Update Dummy Track
                     if nearestMice[0].tag() < 99999:
@@ -459,30 +468,35 @@ def YOLO(trialName, mice, RFID, showVideo):
                     #VALIDATION
                     else:
                         nearestMice[0].validate()
-            if len(lostTrackers) == 1:
-                # Only one lost mouse = only one possibility
-                if len(list(filter(lambda x: x.tag() == lostTrackers[0].tag(), mice))) >= 1:
-                    lostTrackers = []
-                    error = False
-                else:
-    #                   printCheck("Only one unknown, assigned")
-    #                  printCheck(list(map(lambda x: x.tag(), mice)), "mice")
-    #                 printCheck(list(map(lambda x: x.tag(), lostTrackers)), "lost")
-                    missingMouse = list(filter(lambda x: x.tag() < 99999, mice))
-                    if len(missingMouse) > 0:
-                        missingMouse = missingMouse[0]
-                        lostTrackers[0].updatePositions(missingMouse.recordedPositions)
-                        lostTrackers[0].histogram = missingMouse.histogram
-                        lostTrackers[0].validate()
-                        mice.append(lostTrackers[0])
-                        lostTrackers = []
-                        mice.remove(missingMouse)
-                        error = False
-            if len(lostTrackers) == 0:
-                error = False
 
+        # No need to have this as part of validation
+        if len(lostTrackers) == 1:
+            # Only one lost mouse = only one possibility
+            if len(list(filter(lambda x: x.tag() == lostTrackers[0].tag(), mice))) >= 1:
+                lostTrackers = []
+                error = False
+            else:
+                printCheck("Only one unknown, assigned")
+#                  printCheck(list(map(lambda x: x.tag(), mice)), "mice")
+#                 printCheck(list(map(lambda x: x.tag(), lostTrackers)), "lost")
+                missingMouse = list(filter(lambda x: x.tag() < 99999, mice))
+                if len(missingMouse) > 0:
+                    missingMouse = missingMouse[0]
+                    lostTrackers[0].updatePositions(missingMouse.recordedPositions)
+                    lostTrackers[0].histogram = missingMouse.histogram
+                    lostTrackers[0].validate()
+                    mice.append(lostTrackers[0])
+                    lostTrackers = []
+                    mice.remove(missingMouse)
+                    error = False
+        out, masks = ImageProcessing.cvDrawBoxes(cleanedDetections, image, mice)
+        for tag, mask in masks:
+            mouse = list(filter(lambda x: x.tag() == tag, mice))
+            if len(mouse) == 1:
+                mouse = mouse[0]
+                mouse.currCoord[2] = {'mask': mask.tolist()}
         if showVideo:
-            out = ImageProcessing.cvDrawBoxes(cleanedDetections, image, mice)
+
             cv2.imshow('Demo', out)
             cv2.waitKey(3)
         printCheck(list(map(lambda x: x.tag(), mice)),"mice")
@@ -497,14 +511,19 @@ def YOLO(trialName, mice, RFID, showVideo):
         #     plt.show()
 #        time.sleep(0.2)
     mouseDict = {}
+    masksDict = {}
     pbar.close()
     for mouse in filter(lambda x: x.tag() > 99999, mice + lostTrackers):
+        masksDict.update({mouse.tag(): [x[2] for x in mouse.recordedPositions]})
+        for x in mouse.recordedPositions: x[2] = ""
         mouseDict.update({mouse.tag(): mouse.recordedPositions})
         printCheck(mouse.tag(), str(len(mouse.recordedPositions)/frameCount*100) + "% Covered")
     printCheck(list(map(lambda x: str(x[0]) + ":" + str(len(x[1])), event.items())))
     printCheck("frames without all mice: ", badDetections, badDetections/frameCount*100,  "% error")
     with open(dataDrive + dataPath + "/processed.json", "w") as outfile:
         json.dump(mouseDict, outfile, ensure_ascii=False)
+    with open(dataDrive + dataPath + "/masks.json", "w") as outfile:
+        json.dump(masksDict, outfile, ensure_ascii=False)
 
 
 def printCheck(*objects):
@@ -523,7 +542,7 @@ def scrapeText(RTS):
             taglist.append(int(row))
     return taglist
 
-def run(drive, path, showVid=False, frames=False, verb=False):
+def run(drive, path, showVid=False, frames=False, verb=True):
     mouseTrackers = []
     global dataPath, dataDrive, useFrames, verbose, tags
     dataDrive = drive

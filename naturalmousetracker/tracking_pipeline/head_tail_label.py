@@ -14,9 +14,15 @@ def convertBack(x, y, w, h):
     ymax = int(round(y + (h / 2)))
     return xmin, ymin, xmax, ymax
 
-likelihood_thresh = 0.95
+likelihood_thresh = 0.9
 
-def getHeadVector(poseData):
+def distanceBetweenPos(p1, p2):
+    if p1[0] is None or p2[0] is None:
+        return False
+    x1, y1, x2, y2 = p1[0], p1[1], p2[0], p2[1]
+    return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
+
+def getHeadVector(poseData, mid_angle):
     nose     = poseData[0]
     head     = poseData[1]
     neck     = poseData[4]
@@ -27,13 +33,23 @@ def getHeadVector(poseData):
     for opt in options:
         if opt[0] != (None, None) and opt[1] != (None, None):
             midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
-            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
-            angle *= (180/np.pi)
+            angle = np.arctan2(opt[1][1] - opt[0][1], opt[1][0] - opt[0][0])
             chosen_opt = opt
             break
     return (chosen_opt, midpoint, angle)
 
-def getTailVector(poseData):
+def getFOV(headVector):
+    headPoint = headVector[1]
+    upperAngle = headVector[2] + np.pi/8
+    lowerAngle = headVector[2] - np.pi/8
+    FOVLength = 120.0
+    u_y, u_x = headPoint[1] + np.sin(upperAngle)*FOVLength, \
+    headPoint[0] +np.cos(upperAngle)*FOVLength
+    l_y, l_x =  headPoint[1] + np.sin(lowerAngle)*FOVLength, \
+    headPoint[0] +np.cos(lowerAngle)*FOVLength
+
+    return [headPoint, (u_x, u_y), (l_x, l_y)]
+def getTailVector(poseData, mid_angle):
     midspine = poseData[5]
     pelvis   = poseData[6]
     tail     = poseData[7]
@@ -42,8 +58,7 @@ def getTailVector(poseData):
     for opt in options:
         if opt[0] != (None, None) and opt[1] != (None, None):
             midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
-            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
-            angle *= (180/np.pi)
+            angle = np.arctan2(opt[1][1] - opt[0][1], opt[1][0] - opt[0][0])
             chosen_opt = opt
             break
     return (chosen_opt, midpoint, angle)
@@ -57,8 +72,7 @@ def getMidVector(poseData):
     for opt in options:
         if opt[0] != (None, None) and opt[1] != (None, None):
             midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
-            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
-            angle *= (180/np.pi)
+            angle = np.arctan2(opt[1][1] - opt[0][1], opt[1][0] - opt[0][0])
             chosen_opt = opt
             break
     return (chosen_opt, midpoint, angle)
@@ -66,7 +80,7 @@ def getMidVector(poseData):
 
 def run(dataDrive, dataPath, configPath, useFrames=False):
     # config_path = 'G://PoseEstimation-Braeden-2019-11-13//config.yaml'
-    # deeplabcut.analyze_videos(configPath, [dataDrive + dataPath + "/videos"], videotype=".avi", save_as_csv=True)
+    deeplabcut.analyze_videos(configPath, [dataDrive + dataPath + "/videos"], videotype=".avi", save_as_csv=True)
 
     with open (dataDrive + dataPath + "/processed.json", "r") as darkFile:
         darkData = json.loads(darkFile.read())
@@ -170,20 +184,43 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                         else:
                             poseParts.append((None, None))
                         i += 2
-                    print(poseParts)
+                    dist, closest = 9999, -1
+                    nose = poseParts[0]
+                    if nose[0] is not None:
+                        for i in range(1, len(poseParts)-1):
+                            if poseParts[i] is not None and distanceBetweenPos(nose, poseParts[i]) < dist:
+                                dist = distanceBetweenPos(nose, poseParts[i])
+                                closest = i
+                        if closest > 4:
+                            poseParts[0] = (None, None)
+                            positions[lastFrameDict[tag]][6] = None
+                            positions[lastFrameDict[tag]][7] = None
+                    tail = poseParts[7]
+                    dist, closest = 9999, 8
+                    if tail[0] is not None:
+                        for i in range(1, len(poseParts)-1):
+                            if poseParts[i] is not None and distanceBetweenPos(tail, poseParts[i]) < dist:
+                                dist = distanceBetweenPos(tail, poseParts[i])
+                                closest = i
+                        if closest < 5:
+                            poseParts[7] = (None, None)
+                            positions[lastFrameDict[tag]][20] = None
+                            positions[lastFrameDict[tag]][21] = None
                     if len(positions[lastFrameDict[tag]]) >=10:
                         for i in range(0, len(poseParts)):
                             if poseParts[i][0] is not None:
                                 cv2.circle(frame_read, poseParts[i], 5, colors[i])
-                        h_v = getHeadVector(poseParts)[0]
-                        t_v = getTailVector(poseParts)[0]
-                        m_v = getMidVector(poseParts)[0]
-                        if h_v is not None:
-                            cv2.arrowedLine(frame_read, h_v[0], h_v[1], [255, 0, 0])
-                        if t_v is not None:
-                            cv2.arrowedLine(frame_read, t_v[0], t_v[1], [0, 255, 0])
-                        if m_v is not None:
-                            cv2.arrowedLine(frame_read, m_v[0], m_v[1], [0, 0, 255])
+                        m_v = getMidVector(poseParts)
+                        h_v = getHeadVector(poseParts, m_v[2])
+                        t_v = getTailVector(poseParts, m_v[2])
+                        if h_v[0] is not None:
+                            cv2.arrowedLine(frame_read, h_v[0][0], h_v[0][1], [255, 0, 0])
+                            FOV = np.array(getFOV(h_v), dtype=np.int32)
+                            cv2.fillPoly(frame_read, np.int32([FOV]), [0, 255, 0])
+                        if t_v[0] is not None:
+                            cv2.arrowedLine(frame_read, t_v[0][0], t_v[0][1], [0, 255, 0])
+                        if m_v[0] is not None:
+                            cv2.arrowedLine(frame_read, m_v[0][0], m_v[0][1], [0, 0, 255])
                     cv2.rectangle(frame_read, pt1, pt2, (0, 255, 0), 1)
                     cv2.putText(frame_read,
                                 str(tag),

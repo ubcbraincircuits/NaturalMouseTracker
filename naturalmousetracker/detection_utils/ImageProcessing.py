@@ -35,7 +35,7 @@ class ImageProcessing:
                      " [vis]",
                       (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                       [255, 0, 255], 2)
-
+        masks = []
         for detection in detections:
             x, y, w, h = detection[2][0],\
                 detection[2][1],\
@@ -48,7 +48,8 @@ class ImageProcessing:
             pt1 = (max(xmin, 0), max(ymin, 0))
             pt2 = (min(xmax, 640), min(ymax, 640))
             try:
-                ImageProcessing.findEllipse(img, pt1, pt2, output_im, new_bg)
+                mask = ImageProcessing.findMask(img, pt1, pt2, output_im, new_bg)
+                masks.append((detection[0], mask))
             except Exception as e:
                 print(str(e))
             cv2.rectangle(output_im, pt1, pt2, (0, 255, 0), 1)
@@ -76,9 +77,9 @@ class ImageProcessing:
             # print(np.where(new_bg > 254))
             ImageProcessing.background_images[0] = np.where(new_bg > 254,
                 ImageProcessing.background, new_bg)
-        return output_im
+        return output_im, masks
 
-    def findEllipse(img, pt1, pt2, output_im, new_bg):
+    def findMask(img, pt1, pt2, output_im, new_bg):
         pt1_ex = (max(pt1[0] -20, 0), max(pt1[1] -20, 0))
         pt2_ex = (min(pt2[0] + 20, 640), min(pt2[1] +20, 640))
         crop_img = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
@@ -99,9 +100,16 @@ class ImageProcessing:
             if maxArea < area:
                 bestContour = c
                 maxArea = area
-        cv2.drawContours(thresh, bestContour, -1, (0,255,0), 3)
-        # output_im[pt1[1]:pt2[1], pt1[0]:pt2[0]] = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
-        if bestContour.shape[0] > 5:
-            ellipse = list(cv2.fitEllipse(bestContour))
-            ellipse[0] = ellipse[0][0] + pt1[0], ellipse[0][1] + pt1[1]
-            cv2.ellipse(output_im, tuple(ellipse), (255,0,255), 2)
+        bestContour[:, :, 0] += pt1[0]
+        bestContour[:, :, 1] += pt1[1]
+        thresh = cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
+        cv2.drawContours(output_im, bestContour, -1, (0,255,0), 3)
+        bestContour[:, :, 0] = bestContour[:, :, 0] * 912/640
+        bestContour[:, :, 1] = bestContour[:, :, 1] * 720/640
+        bestContour = np.int32(bestContour, casting="unsafe")
+        return bestContour
+        # output_im[pt1[1]:pt2[1], pt1[0]:pt2[0]] = t
+        # if bestContour.shape[0] > 5:
+        #     ellipse = list(cv2.fitEllipse(bestContour))
+        #     ellipse[0] = ellipse[0][0] + pt1[0], ellipse[0][1] + pt1[1]
+        #     cv2.ellipse(output_im, tuple(ellipse), (255,0,255), 2)

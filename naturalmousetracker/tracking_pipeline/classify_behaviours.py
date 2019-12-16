@@ -94,12 +94,22 @@ def getHeadVector(poseData):
     for opt in options:
         if opt[0] != (None, None) and opt[1] != (None, None):
             midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
-            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
-            angle *= (180/np.pi)
+            angle = np.arctan2(opt[1][1] - opt[0][1], opt[1][0] - opt[0][0])
             chosen_opt = opt
             break
     return (chosen_opt, midpoint, angle)
 
+def getFOV(headVector):
+    headPoint = headVector[1]
+    upperAngle = headVector[2] + np.pi/8
+    lowerAngle = headVector[2] - np.pi/8
+    FOVLength = 120.0
+    u_y, u_x = headPoint[1] + np.sin(upperAngle)*FOVLength, \
+    headPoint[0] +np.cos(upperAngle)*FOVLength
+    l_y, l_x =  headPoint[1] + np.sin(lowerAngle)*FOVLength, \
+    headPoint[0] +np.cos(lowerAngle)*FOVLength
+
+    return [headPoint, (u_x, u_y), (l_x, l_y)]
 def getTailVector(poseData):
     midspine = poseData[5]
     pelvis   = poseData[6]
@@ -109,8 +119,7 @@ def getTailVector(poseData):
     for opt in options:
         if opt[0] != (None, None) and opt[1] != (None, None):
             midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
-            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
-            angle *= (180/np.pi)
+            angle = np.arctan2(opt[1][1] - opt[0][1], opt[1][0] - opt[0][0])
             chosen_opt = opt
             break
     return (chosen_opt, midpoint, angle)
@@ -124,11 +133,19 @@ def getMidVector(poseData):
     for opt in options:
         if opt[0] != (None, None) and opt[1] != (None, None):
             midpoint = ((opt[0][0] + opt[1][0])/2, (opt[0][1] + opt[1][1])/2)
-            angle = np.arctan2(opt[0][1] - opt[1][1], opt[0][0] - opt[1][0])
-            angle *= (180/np.pi)
+            angle = np.arctan2(opt[1][1] - opt[0][1], opt[1][0] - opt[0][0])
             chosen_opt = opt
             break
     return (chosen_opt, midpoint, angle)
+
+def pointInTriangle(triangle, point):
+    p0, p1, p2 = triangle
+    px, py = point
+    Area = 0.5 *(-p1[1]*p2[0] + p0[1]*(-p1[1] + p2[0]) + p0[0]*(p1[1] - p2[1]) + p1[1]*p2[1]);
+    s = 1/(2*Area)*(p0[1]*p2[0] - p0[0]*p2[1] + (p2[1] - p0[1])*px + (p0[0] - p2[0])*py);
+    t = 1/(2*Area)*(p0[0]*p1[1] - p0[1]*p1[1] + (p0[1] - p1[1])*px + (p1[1] - p0[0])*py);
+    return (s > 0 and t > 0 and 1-s-t > 0)
+
 
 
 def saveData(arr, SQL, csv, table):
@@ -196,9 +213,11 @@ def run(dataDrive, dataPath, user, host, db, password):
                                 datum[i][4]*912/640,\
                                 datum[i][5]*720/640  # Darknet saves the images to a 640x640 square
                                 # We resize these back to the original frame size.
+                            # mask = datum[i][2].values()
                         else:
                             x, y, w, h = datum[i][0]*912/640,\
                                 datum[i][1]*720/640, 0, 0
+                            # mask = []
                         xmin, ymin, xmax, ymax = convertBack(
                             float(x), float(y), float(w), float(h))
                         poseParts = []
@@ -215,7 +234,7 @@ def run(dataDrive, dataPath, user, host, db, password):
                         center = (float(x), float(y))
                         # pt1 = (xmin, ymin)
                         # pt2 = (xmax, ymax)
-                        pos = [center, float(w), float(h), poseParts] # head_pos, #tail_pos]
+                        pos = [center, float(w), float(h), poseParts]
                         mouseDict[tag].append(pos)
                         lastFrameDict[tag] =i
                         break
@@ -269,15 +288,19 @@ def run(dataDrive, dataPath, user, host, db, password):
     position_save_query = """INSERT INTO `Positions` (`Center_x`, `Center_y`,
         `Width`, `Height`, `V_x`, `V_y`, `Speed`)
         VALUES(%s,%s,%s,%s,%s,%s,%s)"""
-    pose_save_query = """INSERT INTO `Poses` (`Head_x`, `Head_y`,
-        `Tail_x`, `Tail_y`, `LeftEar_x`, `LeftEar_y`,
-        `RightEar_x`, `RightEar_y`) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"""
+    pose_save_query = """INSERT INTO `Poses` (`Nose_x`, `Nose_y`,
+        `Head_x`, `Head_y`, `LeftEar_x`, `LeftEar_y`, `RightEar_x`, `RightEar_y`,
+        `Neck_x`, `Neck_y`, `Midspine_x`, `Midspine_y`,
+        `Pelvis_x`, `Pelvis_y`, `Tail_x`, `Tail_y`
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"""
     for tag, name in files.items():
         files[tag] = open(name, 'w')
         files[tag].write("Tag,Date,Time,Behaviour,Others_Involved,Location,"
                             "Center_x,Center_y,Width,"
-                            "Height,Head_x,Head_y,Tail_x,Tail_y,"
+                            "Height,Nose_x,Nose_y,Head_x,Head_y,"
                             "L_Ear_x,L_Ear_y,R_Ear_x,R_Ear_y,"
+                            "Neck_x, Neck_y, Midspine_x, Midspine_y,"
+                            "Pelvis_x, Pelvis_y, Tail_x, Tail_y"
                             "Velocity_x,Velocity_y,Speed,\n")
 
     for i in range(0, totalFrames): # Iterate over all frames
@@ -305,25 +328,51 @@ def run(dataDrive, dataPath, user, host, db, password):
                         continue
                     dist = distanceBetweenPos(positions[i], other_pos[i])
                     # Add mice to the 'group' if they are close enough together
-                    if dist and dist < group_radius:
-                        group.add(mouse)
-                        group.add(other)
-                    elif dist and dist < social_radius and velocities[mouse] is not None:
+                    if dist and dist < social_radius and velocities[mouse] is not None:
                         # If they are not grouping, they may be approaching. Determine
                         # if their direction of motion is in the direction of another mouse.
                         # Add Head/tail information to this later.
-                        dist_vector = (other_pos[i][0][0] - positions[i][0][0],
-                            other_pos[i][0][1] - positions[i][0][1])
-                        dot = dist_vector[0]*velocities[mouse][0] + dist_vector[1]*velocities[mouse][1]
-                        det = dist_vector[0]*velocities[mouse][1] - dist_vector[1]*velocities[mouse][0]
-                        angle = math.atan2(det, dot)*(180/np.pi)  # atan2(y, x) or atan2(sin, cos)
-                        if abs(angle) < 20 and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > velocity_thresh:
-                            if len(approaches[mouse]) == 0 or  approaches[mouse][-1][0] < i -10:
-                                approaches[mouse].append((i, other))
+                        poseData = positions[i][3]
+                        m_v = getMidVector(poseData)
+                        h_v = getHeadVector(poseData)
+                        t_v = getTailVector(poseData)
+                        otherPoseData = other_pos[i][3]
+                        o_m_v = getMidVector(otherPoseData)
+                        o_h_v = getHeadVector(otherPoseData)
+                        o_t_v = getTailVector(otherPoseData)
+                        if h_v[0] is not None:
+                            fov = getFOV(h_v)
+                            if o_h_v[0] is not None and\
+                                pointInTriangle(fov, o_h_v[0][1]) and\
+                                pointInTriangle(o_fov, h_v[0][1]):
+                                o_fov = getFOV(o_h_v)
+                                saveData(['HeadToHead', other], SQL[mouse], files[mouse], 'behaviour')
                                 behaviourAssigned = True
-                                # If they are approaching, that is their behaviour on this frame.
-                                saveData(['Approaching', other],SQL[mouse], files[mouse], 'behaviour')
-            if mouse in group:
+                            elif o_t_v[0] is not None and pointInTriangle(fov, o_t_v[0][1]):
+                                saveData(['HeadToAgenovenital', other], SQL[mouse], files[mouse], 'behaviour')
+                                behaviourAssigned = True
+                            # elif any(pointInTriangle(fov, x[0]) for x in positions[i][4]):
+                            #     saveData(['HeadToSide', other], SQL[mouse], files[mouse], 'behaviour')
+                            #     behaviourAssigned = True
+
+                        if not behaviourAssigned:
+                            dist_vector = (other_pos[i][0][0] - positions[i][0][0],
+                                other_pos[i][0][1] - positions[i][0][1])
+                            dot = dist_vector[0]*velocities[mouse][0] + dist_vector[1]*velocities[mouse][1]
+                            det = dist_vector[0]*velocities[mouse][1] - dist_vector[1]*velocities[mouse][0]
+                            angle = math.atan2(det, dot)*(180/np.pi)  # atan2(y, x) or atan2(sin, cos)
+                            if abs(angle) < 20 and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > velocity_thresh:
+                                if len(approaches[mouse]) == 0 or  approaches[mouse][-1][0] < i -10:
+                                    approaches[mouse].append((i, other))
+                                    behaviourAssigned = True
+                                    # If they are approaching, that is their behaviour on this frame.
+                                    saveData(['Approaching', other],SQL[mouse], files[mouse], 'behaviour')
+                    if dist and dist < group_radius:
+                        group.add(mouse)
+                        group.add(other)
+
+
+            if mouse in group and not behaviourAssigned:
                 behaviourAssigned = True
                 if mouse not in lastGroup:
                     #If they entered this group and they were not in a group before
@@ -341,7 +390,7 @@ def run(dataDrive, dataPath, user, host, db, password):
                     if other != mouse:
                         writeStr += other + ';'
                 saveData([writeStr[:-1]], SQL[mouse], files[mouse], 'behaviour')
-            else:
+            elif mouse not in group and not behaviourAssigned:
                 if mouse in lastGroup:
                     #If they were in a group before and are no longer in one
                     saveData(['GroupLeaving'], SQL[mouse], files[mouse], 'behaviour')
@@ -414,34 +463,27 @@ def run(dataDrive, dataPath, user, host, db, password):
                 else:
                     saveData(["Center"], SQL[mouse], files[mouse], "behaviour")
                 count = 0
-                table = 'position'
+                saveData([position[i][1:3]], SQL[mouse], files[mouse], 'position')
                 # Save all the location and pose data with a simple regex.
-                for aspect in positions[i]:
-                    if count >= 4:
-                        # bbox information goes in the position table. The rest goes in
-                        # the pose table.
-                        table = "pose"
+                for aspect in positions[i][3]:
                     if type(aspect).__name__ == 'tuple':
                         for num in aspect:
                             count += 1
-                            saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(num)))], SQL[mouse], files[mouse], table)
+                            saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(num)))], SQL[mouse], files[mouse], 'pose')
                     else:
                         count += 1
-                        saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(aspect)))], SQL[mouse], files[mouse], table)
-                while count < 12:  # Number of potential positions (i.e head, tail)
-                    if count >= 4:
-                        table = "pose"
-                    saveData([0], SQL[mouse], files[mouse], table)
+                        saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(aspect)))], SQL[mouse], files[mouse], 'pose')
+                while count < 16:  # Number of potential positions (i.e head, tail)
+                    saveData([0], SQL[mouse], files[mouse], 'pose')
                     count += 1
             else:
-                # No Location as their was no position
+                # No Location as there was no position
                 saveData(["NULL"], SQL[mouse], files[mouse], "behaviour")
+                saveData([0, 0], SQL[mouse], files[mouse], 'position')
                 table = 'position'
                 count = 0
-                while count < 12:  # Number of potential positions (i.e head, tail)
-                    if count >= 4:
-                        table = "pose"
-                    saveData([0], SQL[mouse], files[mouse], table)
+                while count < 16:  # Number of potential positions (i.e head, tail)
+                    saveData([0], SQL[mouse], files[mouse], 'pose')
                     count += 1
             if velocities[mouse] is not None:
                 # Save velocity if it is known

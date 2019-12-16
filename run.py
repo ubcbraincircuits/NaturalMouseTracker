@@ -31,7 +31,7 @@ if __name__ == "__main__":
         folder = input("Please enter the name of the folder containing your video data.\n\
          An example would be 1970-01-01_00-00.: ")
         if action == 2:
-            detect_mice.run(drive, folder, showVid=True)
+            detect_mice.run(drive, folder, showVid=True, verb=True)
         elif action == 3:
             crop_videos.run(drive, folder)
         elif action == 4:

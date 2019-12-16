@@ -12,11 +12,11 @@ class MouseTracker:
     kVelocityDiff = 0.01
     kHistogramDiff = 0.5
 
-    def __init__(self, startCoord, id, frame = '', frameCount = 0, width = 0, height = 0):
+    def __init__(self, startCoord, id, mask = [], frameCount = 0, width = 0, height = 0):
         self.currCoord = startCoord
         self.positionQueue = deque(maxlen=2)
         if startCoord != [0,0]:
-            startCoord.append(frame)
+            startCoord.append(mask)
             startCoord.append(frameCount)
             startCoord.append(width)
             startCoord.append(height)
@@ -35,9 +35,9 @@ class MouseTracker:
         self.velocity = (0,0)
         self.lostCounter= -1
 
-    def updatePosition(self, coordinate, frame='', frameCount = 0, width = 0, height = 0):
+    def updatePosition(self, coordinate, mask=[], frameCount = 0, width = 0, height = 0):
         self.currCoord = coordinate
-        coordinate.append(frame)
+        coordinate.append(mask)
         coordinate.append(frameCount)
         coordinate.append(width)
         coordinate.append(height)
@@ -105,7 +105,7 @@ class MouseTracker:
     def updatePositions(self, newPositions):
         for position in newPositions:
             for rec in self.recordedPositions:
-                if rec[2] == position[2]:
+                if rec[3] == position[3]:
                     self.recordedPositions.remove(rec)
         self.recordedPositions.extend(newPositions)
         self.recordedPositions = sorted(self.recordedPositions, key = lambda x: x[3])
