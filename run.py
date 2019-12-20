@@ -3,6 +3,7 @@ import naturalmousetracker.tracking_pipeline.detect_mice as detect_mice
 import naturalmousetracker.tracking_pipeline.crop_videos as crop_videos
 import naturalmousetracker.tracking_pipeline.head_tail_label as dlc
 import naturalmousetracker.tracking_pipeline.classify_behaviours as classify
+import getpass
 
 if __name__ == "__main__":
     action = None

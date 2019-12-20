@@ -14,7 +14,7 @@ def convertBack(x, y, w, h):
     ymax = int(round(y + (h / 2)))
     return xmin, ymin, xmax, ymax
 
-likelihood_thresh = 0.9
+likelihood_thresh = 0.99
 
 def distanceBetweenPos(p1, p2):
     if p1[0] is None or p2[0] is None:
@@ -27,8 +27,8 @@ def getHeadVector(poseData, mid_angle):
     head     = poseData[1]
     neck     = poseData[4]
     midspine = poseData[5]
-    options = ((head, nose), (neck, nose), (midspine, nose),
-        (neck, head), (midspine, head), (midspine, neck))
+    options = ((neck, head), (midspine, head),
+    (head, nose), (neck, nose), (midspine, nose), (midspine, neck))
     chosen_opt, midpoint, angle = None, None, None
     for opt in options:
         if opt[0] != (None, None) and opt[1] != (None, None):
@@ -134,6 +134,7 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
             + dataPath
             + "/tracking"
             + '.h264')
+
     while True:
         try:
             frameName = dataDrive + dataPath + "/tracking_systembase_tracking" + str(frameCount) + ".jpg"
@@ -150,6 +151,7 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
         except Exception as e:
             print(str(e))
             break
+
         for (tag, positions) in darkData.items():
             while True:
                 if len(positions) <= lastFrameDict[tag]:
@@ -165,12 +167,12 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                     pt2 = (xmax, ymax)
 
                     #Smaller rectangle for HTS and STS
-                    HTS_p1 = (xmin + 1/2*w, ymin + 1/2*h)
-                    HTS_p2 = (xmax - 1/2*w, ymin - 1/2*h)
+                    # HTS_p1 = (xmin + 1/2*w, ymin + 1/2*h)
+                    # HTS_p2 = (xmax - 1/2*w, ymin - 1/2*h)
 
                     poseParts = []
                     #Draw rectangle used in head side calculations
-                    cv2.rectangle(frame_read, HTS_p1, HTS_p2, (0, 255, 0), 1)
+                    # cv2.rectangle(frame_read, HTS_p1, HTS_p2, (0, 255, 0), 1)
 
                     # Nose, head, left ear, right ear, neck,
                     # midspine, pelvis, tail
@@ -201,8 +203,8 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                                 closest = i
                         if closest > 4:
                             poseParts[0] = (None, None)
-                            positions[lastFrameDict[tag]][6] = None
-                            positions[lastFrameDict[tag]][7] = None
+                            darkData[tag][lastFrameDict[tag]][6] = None
+                            darkData[tag][lastFrameDict[tag]][7] = None
                     tail = poseParts[7]
                     dist, closest = 9999, 8
                     if tail[0] is not None:
@@ -212,8 +214,8 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                                 closest = i
                         if closest < 5:
                             poseParts[7] = (None, None)
-                            positions[lastFrameDict[tag]][20] = None
-                            positions[lastFrameDict[tag]][21] = None
+                            darkData[tag][lastFrameDict[tag]][20] = None
+                            darkData[tag][lastFrameDict[tag]][21] = None
                     if len(positions[lastFrameDict[tag]]) >=10:
                         for i in range(0, len(poseParts)):
                             if poseParts[i][0] is not None:
@@ -241,6 +243,7 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                     lastFrameDict[tag] += 1
                 else:
                     break
+
         print("wrote frame", frameCount)
         video.write(frame_read)
     video.release()

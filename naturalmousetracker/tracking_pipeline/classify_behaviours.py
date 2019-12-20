@@ -69,11 +69,11 @@ def distanceBetweenPos(p1, p2):
     return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 
 
-group_radius = 120
-social_radius = 150
-entranceX = 784
-entranceY = 450
-velocity_thresh = 5
+group_radius = 160
+social_radius = 250
+entranceX = 827
+entranceY = 281
+velocity_thresh = 10
 
 
 def convertBack(x, y, w, h):
@@ -88,8 +88,8 @@ def getHeadVector(poseData):
     head     = poseData[1]
     neck     = poseData[4]
     midspine = poseData[5]
-    options = ((head, nose), (neck, nose), (midspine, nose),
-        (neck, head), (midspine, head), (midspine, neck))
+    options = ((neck, head), (midspine, head),
+    (head, nose), (neck, nose), (midspine, nose), (midspine, neck))
     chosen_opt, midpoint, angle = None, None, None
     for opt in options:
         if opt[0] != (None, None) and opt[1] != (None, None):
@@ -138,13 +138,36 @@ def getMidVector(poseData):
             break
     return (chosen_opt, midpoint, angle)
 
+#
+# def pointInTriangle(triangle, point):
+#     # print("Point in triangle")
+#     p0, p1, p2 = triangle
+#     px, py = point
+#     Area = 0.5 *(-p1[1]*p2[0] + p0[1]*(-p1[1] + p2[0]) + p0[0]*(p1[1] - p2[1]) + p1[1]*p2[1]);
+#     s = 1/(2*Area)*(p0[1]*p2[0] - p0[0]*p2[1] + (p2[1] - p0[1])*px + (p0[0] - p2[0])*py);
+#     t = 1/(2*Area)*(p0[0]*p1[1] - p0[1]*p1[1] + (p0[1] - p1[1])*px + (p1[1] - p0[0])*py);
+#     return (s > 0 and t > 0 and 1-s-t > 0)
+
+def triangle_area(tri): # tri = (0,0), (0,0), (0,0)
+    x1, y1, x2, y2, x3, y3 = tri[0][0], tri[0][1], tri[1][0], tri[1][1], tri[2][0], tri[2][1]
+    return abs(0.5 * (((x2-x1)*(y3-y1))-((x3-x1)*(y2-y1))))
+
 def pointInTriangle(triangle, point):
+    p = point
     p0, p1, p2 = triangle
-    px, py = point
-    Area = 0.5 *(-p1[1]*p2[0] + p0[1]*(-p1[1] + p2[0]) + p0[0]*(p1[1] - p2[1]) + p1[1]*p2[1]);
-    s = 1/(2*Area)*(p0[1]*p2[0] - p0[0]*p2[1] + (p2[1] - p0[1])*px + (p0[0] - p2[0])*py);
-    t = 1/(2*Area)*(p0[0]*p1[1] - p0[1]*p1[1] + (p0[1] - p1[1])*px + (p1[1] - p0[0])*py);
-    return (s > 0 and t > 0 and 1-s-t > 0)
+
+    t1 = (point, p0, p1)
+    t2 = (point, p1, p2)
+    t3 = (point, p0, p2)
+
+    a_total = triangle_area(triangle)
+    a1 = triangle_area(t1)
+    a2 = triangle_area(t2)
+    a3 = triangle_area(t3)
+
+    return (a_total == (a1 + a2 + a3))
+
+
 
 
 
@@ -171,7 +194,7 @@ def saveData(arr, SQL, csv, table):
 
 
 def run(dataDrive, dataPath, user, host, db, password):
-    darkFile = open(dataDrive + dataPath + "/processed.json", "r")
+    darkFile = open(dataDrive + dataPath + "/processed_ht.json", "r")
     darkData = json.loads(darkFile.read())
 
     mouseDict = {} #Holds key=value pair in format Tag=List where every index is a frame
@@ -223,14 +246,14 @@ def run(dataDrive, dataPath, user, host, db, password):
                         poseParts = []
                         # Nose, head, left ear, right ear, neck,
                         # midspine, pelvis, tail
-                        i = 6
-                        while i < len(positions[lastFrameDict[tag]]) - 1:
-                            if positions[lastFrameDict[tag]][i] is not None:
-                                poseParts.append((float(positions[lastFrameDict[tag]][i]),\
-                                    float(positions[lastFrameDict[tag]][i+1])))
+                        j = 6
+                        while j < len(datum[i]) - 1:
+                            if datum[i][j] is not None:
+                                poseParts.append((float(datum[i][j]),\
+                                    float(datum[i][j+1])))
                             else:
                                 poseParts.append((None, None))
-                            i += 2
+                            j += 2
                         center = (float(x), float(y))
                         # pt1 = (xmin, ymin)
                         # pt2 = (xmax, ymax)
@@ -281,14 +304,14 @@ def run(dataDrive, dataPath, user, host, db, password):
     except Exception as e:
         print(str(e))
         return
-    main_save_query = """INSERT INTO `MiceEvents` (`Tag`, `Date`, `Time`,
+    main_save_query = """INSERT INTO `miceevents` (`Tag`, `Date`, `Time`,
     `Behaviour`, `Position`, `Pose`) VALUES(%s,%s,%s,%s,%s,%s)"""
     behaviour_save_query = """INSERT INTO `Behaviours` (`Name`, `Others`,
         `Location`) VALUES(%s,%s,%s)"""
-    position_save_query = """INSERT INTO `Positions` (`Center_x`, `Center_y`,
+    position_save_query = """INSERT INTO `positions` (`Center_x`, `Center_y`,
         `Width`, `Height`, `V_x`, `V_y`, `Speed`)
         VALUES(%s,%s,%s,%s,%s,%s,%s)"""
-    pose_save_query = """INSERT INTO `Poses` (`Nose_x`, `Nose_y`,
+    pose_save_query = """INSERT INTO `poses` (`Nose_x`, `Nose_y`,
         `Head_x`, `Head_y`, `LeftEar_x`, `LeftEar_y`, `RightEar_x`, `RightEar_y`,
         `Neck_x`, `Neck_y`, `Midspine_x`, `Midspine_y`,
         `Pelvis_x`, `Pelvis_y`, `Tail_x`, `Tail_y`
@@ -306,7 +329,7 @@ def run(dataDrive, dataPath, user, host, db, password):
     for i in range(0, totalFrames): # Iterate over all frames
 
         group = set()
-        print(i)
+        # print(i)
         # Assign a behaviour for each mouse.
         for mouse, positions in mouseDict.items():
             behaviourAssigned = False
@@ -343,18 +366,23 @@ def run(dataDrive, dataPath, user, host, db, password):
                         if h_v[0] is not None:
                             fov = getFOV(h_v)
                             if o_h_v[0] is not None and\
-                                pointInTriangle(fov, o_h_v[0][1]) and\
-                                pointInTriangle(o_fov, h_v[0][1]):
+                                pointInTriangle(fov, o_h_v[0][1]):
                                 o_fov = getFOV(o_h_v)
-                                saveData(['HeadToHead', other], SQL[mouse], files[mouse], 'behaviour')
-                                behaviourAssigned = True
+                                if pointInTriangle(o_fov, h_v[0][1]):
+                                    saveData(['HeadToHead', other], SQL[mouse], files[mouse], 'behaviour')
+                                    behaviourAssigned = True
                             elif o_t_v[0] is not None and pointInTriangle(fov, o_t_v[0][1]):
+                                print(mouse, other, o_t_v, fov)
                                 saveData(['HeadToAgenovenital', other], SQL[mouse], files[mouse], 'behaviour')
+                                print("Agenovential")
+                                print("type: ", type(o_t_v))
+                                print("otv =", o_t_v[0][1])
+                                print("HeadV=", h_v)
                                 behaviourAssigned = True
                             # elif any(pointInTriangle(fov, x[0]) for x in positions[i][4]):
                             #     saveData(['HeadToSide', other], SQL[mouse], files[mouse], 'behaviour')
                             #     behaviourAssigned = True
-
+                            # print("here")
                         if not behaviourAssigned:
                             dist_vector = (other_pos[i][0][0] - positions[i][0][0],
                                 other_pos[i][0][1] - positions[i][0][1])
@@ -410,20 +438,20 @@ def run(dataDrive, dataPath, user, host, db, password):
                 #Assign entry and exit points
                 if exitPos[tag] is None:
                     j = i
-                    while positions[j] is None and j >= 0:
+                    while j >= 0 and positions[j] is None:
                         j -= 1
                     if positions[j] is not None:
-                        exitPos[tag] = (j, positions[j])
+                        exitPos[tag] = (j, positions[j][0])
                     else:
-                        exitPos[tag] = (0, "Unknown")
+                        exitPos[tag] = (0, [0,0])
                 if entrancePos[tag] is None:
                     j = i
-                    while positions[j] is None and j >= 0:
+                    while j < len(positions) - 1 and positions[j] is None:
                         j += 1
                     if positions[j] is not None:
-                        entrancePos[tag] = (j, positions[j])
+                        entrancePos[tag] = (j, positions[j][0])
                     else:
-                        exitPos[tag] = (frameCount, "Unknown")
+                        exitPos[tag] = (totalFrames, [0,0])
 
             if not behaviourAssigned:
                 if velocities[mouse] and np.sqrt(velocities[mouse][1]**2 + velocities[mouse][0]**2) > velocity_thresh:
@@ -431,7 +459,7 @@ def run(dataDrive, dataPath, user, host, db, password):
                     saveData(["Exploring"], SQL[mouse], files[mouse], 'behaviour')
                 elif positions[i] is None:
                     # We have no data for this section.
-                    if entrancePos[tag][0] - exitPos[tag][0] >= 60:
+                    if entrancePos[tag] and exitPos[tag] and entrancePos[tag][0] - exitPos[tag][0] >= 60:
                         # The period of unknown data is longer than 60 frames.
                         # Mice are either Nesting or Clumping. If they are in the
                         # entrance to the nesting area on either their disappearing
@@ -463,27 +491,34 @@ def run(dataDrive, dataPath, user, host, db, password):
                 else:
                     saveData(["Center"], SQL[mouse], files[mouse], "behaviour")
                 count = 0
-                saveData([position[i][1:3]], SQL[mouse], files[mouse], 'position')
+                saveData(positions[i][0], SQL[mouse], files[mouse], 'position')
+                saveData(positions[i][1:3], SQL[mouse], files[mouse], 'position')
                 # Save all the location and pose data with a simple regex.
                 for aspect in positions[i][3]:
                     if type(aspect).__name__ == 'tuple':
                         for num in aspect:
                             count += 1
-                            saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(num)))], SQL[mouse], files[mouse], 'pose')
+                            if num == None:
+                                saveData([0.0], SQL[mouse], files[mouse], 'pose')
+                            else:
+                                saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(num)))], SQL[mouse], files[mouse], 'pose')
                     else:
                         count += 1
-                        saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(aspect)))], SQL[mouse], files[mouse], 'pose')
+                        if aspect == None:
+                            saveData([0.0], SQL[mouse], files[mouse], 'pose')
+                        else:
+                            saveData([float(re.sub('[^A-Za-z0-9,.]+', '', str(aspect)))], SQL[mouse], files[mouse], 'pose')
                 while count < 16:  # Number of potential positions (i.e head, tail)
-                    saveData([0], SQL[mouse], files[mouse], 'pose')
+                    saveData([0.0], SQL[mouse], files[mouse], 'pose')
                     count += 1
             else:
                 # No Location as there was no position
                 saveData(["NULL"], SQL[mouse], files[mouse], "behaviour")
-                saveData([0, 0], SQL[mouse], files[mouse], 'position')
+                saveData([0, 0, 0, 0], SQL[mouse], files[mouse], 'position')
                 table = 'position'
                 count = 0
                 while count < 16:  # Number of potential positions (i.e head, tail)
-                    saveData([0], SQL[mouse], files[mouse], 'pose')
+                    saveData([0.0], SQL[mouse], files[mouse], 'pose')
                     count += 1
             if velocities[mouse] is not None:
                 # Save velocity if it is known
@@ -511,7 +546,6 @@ def run(dataDrive, dataPath, user, host, db, password):
     # Save all the info to SQL
     for tag, data in SQL.items():
             for i in range(0, len(data['main']) -1):
-                print(i)
                 try:
                     cur.execute(pose_save_query, data['pose'][i])
                     pose_id = cur.lastrowid
@@ -520,16 +554,14 @@ def run(dataDrive, dataPath, user, host, db, password):
                     position_id = cur.lastrowid
                     # print('position done')
                     cur.execute(behaviour_save_query, data['behaviour'][i])
-                    print('behaviour done')
+                    # print('behaviour done')
                     behaviour_id = cur.lastrowid
                     cur.execute(main_save_query, data['main'][i] + [behaviour_id, position_id, pose_id])
                 except Exception as e:
                     print(str(e))
             db.commit()
     db.close()
-    print("two - Entering:", len(twoGroupFormingFrames),  "- Leaving:",  len(twoGroupLeavingFrames))
-    print("three - Entering:", len(threeGroupFormingFrames), "- Leaving:",  len(threeGroupLeavingFrames))
-    print(approaches)
+    print("Done!")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
