@@ -8,6 +8,7 @@ import datetime
 from picamera import PiCamera
 from threading import Thread
 from queue import Queue
+from os import listdir
 import os
 import cv2
 
@@ -19,7 +20,20 @@ class PiVideoStream:
 		self.camera.resolution = resolution
 		self.camera.framerate = framerate
 		self.folder = "/mnt/frameData/" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-		os.mkdir(self.folder) 
+		####changed from os.mkir(self.folder)
+		try:
+			os.mkdir(self.folder) 
+		except:
+			print('file exists')
+			onlyfiles = [f for f in listdir("/mnt/frameData/")]
+			count=0
+			for i in onlyfiles:	
+				if i[:19] == datetime.datetime.now().strftime("%Y-%m-%d_%H-%M"):
+					count=+1
+				else:
+					pass
+			os.mkdir(self.folder+'_'+str(count))
+			self.folder=self.folder+'_'+str(count)
 		self.rawCapture = PiRGBArray(self.camera, size=resolution)
 		self.stream = self.camera.capture_continuous(self.rawCapture,
 			format="bgr", use_video_port=True)
@@ -45,7 +59,7 @@ class PiVideoStream:
 		while True:
                         frame, frameCount = self.frames.get()
                         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                        frameName = 'tracking_system' + self.trialName + str(frameCount) + '.png'
+                        frameName = 'tracking_system___' + self.trialName + '___'+str(frameCount) + '.png'
                         cv2.imwrite(self.folder + "/" + frameName, gray)
                         self.frames.task_done()
                         

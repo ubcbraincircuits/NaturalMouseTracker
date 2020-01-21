@@ -1,3 +1,11 @@
 #frameData/*
 darknet/*
 __pycache__/*
+*.avi
+*.weights
+*.dll
+*/__pycache__/*
+*/*/__pycache__/*
+build/*
+dist/*
+naturalmousetracker_Judge24601.egg-info/*
