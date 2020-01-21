@@ -47,7 +47,7 @@ class MouseTracker:
         self.recordedPositions.append(coordinate)
         if len(self.recordedPositions) > 10:
             self.canDoVisual = True
-        if self.lastPos:
+        if self.lastPos and len(coordinate) > 1:
             self.velocity = ((coordinate[0] - self.lastPos[0]), (coordinate[1] - self.lastPos[1]))
         else:
             self.velocity = (0,0)
@@ -76,6 +76,8 @@ class MouseTracker:
 
     def startVisualTracking(self, frame):
         self.visualTracker = cv2.TrackerCSRT_create()
+        if len(self.currCoord) <= 5:
+            return False
         bbox = (self.currCoord[0] - self.currCoord[4]/2,
             self.currCoord[1] - self.currCoord[5]/2,
             self.currCoord[4], self.currCoord[5])
@@ -100,7 +102,11 @@ class MouseTracker:
         self.validatedIndex = len(self.recordedPositions) - 1
 
     def lastValidatedPosition(self):
-        return self.recordedPositions[self.validatedIndex]
+        if self.validatedIndex > 0 and len(self.recordedPositions) > self.validatedIndex:
+            return self.recordedPositions[self.validatedIndex]
+        if len(self.recordedPositions) > 0:
+            return self.recordedPositions[0]
+        return [0, 0, -1, 0, 0]
 
     def updatePositions(self, newPositions):
         for position in newPositions:
@@ -123,7 +129,7 @@ class MouseTracker:
             self.validatedIndex = index
         tempPositions = self.recordedPositions[self.validatedIndex + 1:]
         self.recordedPositions = self.recordedPositions[:self.validatedIndex+1]
-        if self.validatedIndex >= 0:
+        if self.validatedIndex >= 0 and len(self.recordedPositions) > self.validatedIndex:
            self.currCoord = self.recordedPositions[self.validatedIndex]
        # print(self.id, "Trimmed to", self.validatedIndex, self.lastValidatedPosition())
         return tempPositions

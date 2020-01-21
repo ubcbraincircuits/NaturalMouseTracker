@@ -6,6 +6,8 @@ Adapted from https://github.com/AlexeyAB/darknet
 from ctypes import *
 import math
 import random
+import traceback
+import sys
 import os
 import cv2
 import numpy as np
@@ -562,7 +564,10 @@ def run(drive, path, showVid=False, frames=False, verb=True):
         mouseTrackers.append(MouseTracker([0, 0], tag))
     file = open(dataFileName, "r")
     RFIDResponses = file.readlines()
-    YOLO("base_tracking", mouseTrackers, [], showVideo)
+    try:
+        YOLO("base_tracking", mouseTrackers, [], showVideo)
+    except Exception as e:
+        raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
 if __name__ == "__main__":
