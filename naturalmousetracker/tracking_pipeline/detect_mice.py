@@ -296,8 +296,10 @@ def YOLO(trialName, mice, RFID, showVideo):
                 for nMouse in nearest:
                     if nMouse not in partialLostTrackers:
                         # This checks if there is a mouse nearby to the one that just disappeared.
-                        iou = nMouse.trackLikelihood([tracker.getPosition()[0], tracker.getPosition()[1], tracker.getPosition()[4], tracker.getPosition()[5]], frame_resized)
-
+                        if len(tracker.getPosition()) < 6:
+                            iou = 0
+                        else:
+                            iou = nMouse.trackLikelihood([tracker.getPosition()[0], tracker.getPosition()[1], tracker.getPosition()[4], tracker.getPosition()[5]], frame_resized)
                         printCheck(nMouse.tag(), iou)
                         if iou <= minSwapIOU:
 
@@ -336,6 +338,8 @@ def YOLO(trialName, mice, RFID, showVideo):
             # Lost more than one? Then once it reappears we cannot know which it is.
             # We now require the RFID.
             pos = partialLostTrackers[1].getPosition()
+            if len(pos) < 6 or len(partialLostTrackers[0].getPosition()) < 6:
+                continue
             if partialLostTrackers[0].intersectionOverUnion([pos[0], pos[1], pos[4], pos[5]]) > 0 and len(partialLostTrackers) == 2:
                 for tracker in partialLostTrackers:
                     #printCheck(track.tag(), "partial lost")

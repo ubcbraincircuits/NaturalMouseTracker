@@ -106,7 +106,7 @@ class MouseTracker:
             return self.recordedPositions[self.validatedIndex]
         if len(self.recordedPositions) > 0:
             return self.recordedPositions[0]
-        return [0, 0, -1, 0, 0]
+        return [0, 0, -1, 0, 0, 0]
 
     def updatePositions(self, newPositions):
         for position in newPositions:
