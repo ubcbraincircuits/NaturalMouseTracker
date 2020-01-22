@@ -145,6 +145,8 @@ class MouseTracker:
         return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 
     def intersectionOverUnion (self, pos):
+            if len(self.currCoord) < 5:
+                return 0
             selfArea = self.currCoord[4]*self.currCoord[5]
             if selfArea == 0:
                 return 0
