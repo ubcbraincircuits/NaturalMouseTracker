@@ -198,9 +198,13 @@ class MouseTracker:
         for mouse in others:
             lastCheckedFrameDict.update({mouse.tag(): len(mouse.recordedPositions) -1})
         occlusionPoint = len(self.recordedPositions) -1
+        if occlusionPoint < 0:
+            return 0
         endLoop = False
         for i in range(len(self.recordedPositions) -1, -1, -1):
             for mouse in others:
+                if lastCheckedFrameDict[mouse.tag()] < 0:
+                    continue
                 while self.recordedPositions[i][3] < mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
                     if lastCheckedFrameDict[mouse.tag()] > 0:
                         lastCheckedFrameDict[mouse.tag()] -= 1
@@ -217,7 +221,6 @@ class MouseTracker:
                         break
             if endLoop:
                 break
-        occlusionPoint = self.validatedIndex
         return occlusionPoint
 
     def occlusionPointAfter(self, others, distance):
@@ -234,6 +237,8 @@ class MouseTracker:
         endLoop = False
         for i in range(self.validatedIndex, len(self.recordedPositions)):
             for mouse in others:
+                if len(mouse.recordedPositions) <= lastCheckedFrameDict[mouse.tag()]:
+                    continue
                 while self.recordedPositions[i][3] > mouse.recordedPositions[lastCheckedFrameDict[mouse.tag()]][3]:
                     if lastCheckedFrameDict[mouse.tag()] < len(mouse.recordedPositions) -1:
                         lastCheckedFrameDict[mouse.tag()] += 1
