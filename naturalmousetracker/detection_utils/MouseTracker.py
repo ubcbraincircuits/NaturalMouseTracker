@@ -231,9 +231,13 @@ class MouseTracker:
         as the beginning of its first occlusion.
         """
         lastCheckedFrameDict = {}
+        if len(self.recordedPositions) == 0:
+            return 0
         for mouse in others:
             lastCheckedFrameDict.update({mouse.tag(): 0})
         occlusionPoint = self.validatedIndex
+        if occlusionPoint >= len(self.recordedPositions):
+            return len(self.recordedPositions) - 1
         endLoop = False
         for i in range(self.validatedIndex, len(self.recordedPositions)):
             for mouse in others:
