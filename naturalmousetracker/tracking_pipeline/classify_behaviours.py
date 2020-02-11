@@ -232,6 +232,8 @@ def run(dataDrive, dataPath, user, host, db, password):
         for (tag, datum) in darkData.items():
             if len(datum) > 0 and datum[-1][3] < frameCount:
                 mouseDict[tag].append(None)
+            elif len(datum) == 0:
+                mouseDict[tag] = [None]*totalFrames
             else:
                 for i in range(lastFrameDict[tag], len(datum)):
                     if datum[i][3] == frameCount:
