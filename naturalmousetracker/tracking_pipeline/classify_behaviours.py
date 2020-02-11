@@ -202,8 +202,13 @@ def run(dataDrive, dataPath, user, host, db, password):
     for tag in darkData.keys():
         mouseDict.update({tag: []})
         lastFrameDict.update({tag: 0})
-
-    totalFrames = max(map(lambda x: x[-1][3] if len(x) > 0 else 0, darkData.values()))
+    try:
+        totalFrames = max(map(lambda x: x[-1][3] if len(x) > 0 else 0, darkData.values()))
+    except ValueError e:
+        print("No Mice!")
+        #temp val
+        totalFrames = 13000
+        #All mice will be nesting
 
     frameCount = 1
     """
