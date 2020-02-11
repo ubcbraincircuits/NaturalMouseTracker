@@ -195,6 +195,8 @@ def run(dataDrive, dataPath, configPath, useFrames=False):
                             poseParts.append((None, None))
                         i += 2
                     dist, closest = 9999, -1
+                    if len(poseParts) < 8:
+                        continue
                     nose = poseParts[0]
                     if nose[0] is not None:
                         for i in range(1, len(poseParts)-1):
