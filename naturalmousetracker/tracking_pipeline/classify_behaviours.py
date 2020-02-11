@@ -225,7 +225,7 @@ def run(dataDrive, dataPath, user, host, db, password):
     """
     while True:
         for (tag, datum) in darkData.items():
-            if datum[-1][3] < frameCount:
+            if len(datum) > 0 and datum[-1][3] < frameCount:
                 mouseDict[tag].append(None)
             else:
                 for i in range(lastFrameDict[tag], len(datum)):
