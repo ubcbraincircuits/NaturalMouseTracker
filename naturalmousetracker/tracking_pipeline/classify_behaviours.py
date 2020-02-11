@@ -203,7 +203,7 @@ def run(dataDrive, dataPath, user, host, db, password):
         mouseDict.update({tag: []})
         lastFrameDict.update({tag: 0})
 
-    totalFrames = max(map(lambda x: x[-1][3], darkData.values()))
+    totalFrames = max(map(lambda x: x[-1][3] if len(x) > 0 else 0, darkData.values()))
 
     frameCount = 1
     """
