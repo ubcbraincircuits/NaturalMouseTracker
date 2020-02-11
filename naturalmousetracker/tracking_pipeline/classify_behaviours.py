@@ -204,7 +204,7 @@ def run(dataDrive, dataPath, user, host, db, password):
         lastFrameDict.update({tag: 0})
     try:
         totalFrames = max(map(lambda x: x[-1][3] if len(x) > 0 else 0, darkData.values()))
-    except ValueError e:
+    except ValueError as e:
         print("No Mice!")
         #temp val
         totalFrames = 13000
