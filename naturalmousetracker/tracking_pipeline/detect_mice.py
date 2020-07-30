@@ -510,7 +510,7 @@ def YOLO(trialName, trackedMice, RFID, showVideo):
             cv2.waitKey(3)
         printCheck(list(map(lambda x: x.tag(), trackedMice)),"trackedMice")
         printCheck(list(map(lambda x: x.tag(), lostTrackers)), "lost")
-        outMatrix.append(deepcopy(outRow), ignore_index=True)
+        outMatrix.append(deepcopy(outRow))
 #        time.sleep(0.2)
     mouseDict = {}
     # masksDict = {}
@@ -521,8 +521,20 @@ def YOLO(trialName, trackedMice, RFID, showVideo):
         for x in mouse.recordedPositions: x[2] = ""
         mouseDict.update({mouse.tag(): mouse.recordedPositions})
         printCheck(mouse.tag(), str(len(mouse.recordedPositions)/frameCount*100) + "% Covered")
+    finalOutMatrix = []
+    framePointers = {i: 0 for i in mouseDict.keys()}
+    for i in range(0, max(map(lambda x: x.recordedPositions[-1][3], mouseDict.values()))):
+        finalOutRow = {"Frame": 0, "Mice" = []}
+        for tag, m in mouseDict.items():
+            if i == m.recordedPositions[framePointers[tag]][3]:
+                framePointers[tag] += 1
+                finalOutRow["Mice"].append([tag, m.[framePointers[tag]]])
+        finalOutMatrix.append(deepcopy(finalOutRow))
+    finalOutFrame = pd.DataFrame(finalOutMatrix)
+
     with pd.ExcelWriter(dataDrive + dataPath + "/live_data.xlsx") as writer:  
         outFrame.to_excel(writer, sheet_name="Live Data")
+        finalOutFrame.to_excel(writer, sheet_name="Final Data")
     printCheck(list(map(lambda x: str(x[0]) + ":" + str(len(x[1])), event.items())))
     printCheck("frames without all mice: ", badDetections, badDetections/frameCount*100,  "% error")
     with open(dataDrive + dataPath + "/processed.json", "w") as outfile:
